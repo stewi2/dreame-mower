@@ -237,6 +237,81 @@ def parse_mow_paths(batch_data: dict) -> list[MowerMowPath]:
     return []
 
 
+def vector_map_to_map_data(vector_map: MowerVectorMap) -> dict:
+    """Convert a MowerVectorMap into the dict format expected by generate_svg_map_image.
+
+    This bridges the batch API vector map data into the existing rendering pipeline
+    so we don't need a separate SVG generator for vector maps.
+
+    Returns:
+        Dict with "map", "obstacle", "trajectory", and "start" keys.
+    """
+    # Build a lookup of mow_paths keyed by zone_id for fast matching
+    mow_paths_by_zone: dict[int, MowerMowPath] = {}
+    for mp in vector_map.mow_paths:
+        mow_paths_by_zone.setdefault(mp.zone_id, mp)
+
+    sentinel = [2147483647, 2147483647]
+
+    map_items = []
+    for zone in vector_map.zones:
+        data = [[x, y] for x, y in zone.path]
+
+        # Build track from matching mow_path segments, joined with sentinels
+        track: list[list[int]] = []
+        mp = mow_paths_by_zone.get(zone.zone_id)
+        if mp:
+            for i, seg in enumerate(mp.segments):
+                if i > 0:
+                    track.append(sentinel)
+                track.extend([x, y] for x, y in seg)
+
+        map_items.append({
+            "data": data,
+            "track": track,
+            "id": zone.zone_id,
+            "name": zone.name,
+            "area": zone.area,
+        })
+
+    # If mow_paths have zone_id=0 (unassigned), attach to all zones or as standalone
+    mp_unassigned = mow_paths_by_zone.get(0)
+    if mp_unassigned and not any(z.zone_id == 0 for z in vector_map.zones):
+        track: list[list[int]] = []
+        for i, seg in enumerate(mp_unassigned.segments):
+            if i > 0:
+                track.append(sentinel)
+            track.extend([x, y] for x, y in seg)
+        # Attach to first zone if it exists, otherwise create a standalone entry
+        if map_items:
+            map_items[0]["track"] = track
+        else:
+            map_items.append({"data": [], "track": track})
+
+    obstacles = []
+    for fa in vector_map.forbidden_areas:
+        obstacles.append({
+            "data": [[x, y] for x, y in fa.path],
+            "id": fa.zone_id,
+            "type": 0,
+        })
+
+    trajectories = []
+    for nav_path in vector_map.paths:
+        trajectories.append({
+            "data": [[x, y] for x, y in nav_path.path],
+        })
+
+    start = int(vector_map.last_updated) if vector_map.last_updated else 0
+
+    return {
+        "map": map_items,
+        "obstacle": obstacles,
+        "trajectory": trajectories,
+        "start": start,
+    }
+
+
 def parse_batch_map_data(batch_data: dict) -> MowerVectorMap | None:
     """Parse complete batch device data response into a MowerVectorMap.
 

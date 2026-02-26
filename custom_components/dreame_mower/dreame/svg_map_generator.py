@@ -37,6 +37,20 @@ COLORS_SVG = {
     'text_bg': "#ffff003b",  # yellow
 }
 
+# Zone fill colors — soft pastels matching the Dreame app palette
+# Each entry is (fill_with_alpha, outline)
+ZONE_COLORS = [
+    ('#a4d291c8', '#86be73'),  # Green
+    ('#a0c8dcc8', '#82aac8'),  # Blue
+    ('#f0c8aac8', '#dcaf8c'),  # Beige/tan
+    ('#f0b4b4c8', '#dc9696'),  # Pink/salmon
+    ('#e6dca0c8', '#d2c882'),  # Yellow
+    ('#beaadcc8', '#aa91c8'),  # Purple
+    ('#aad7d2c8', '#8cc3be'),  # Teal
+    ('#dcbea0c8', '#c8a582'),  # Warm brown
+]
+ZONE_LABEL_COLOR = '#3c3c3c'
+
 # Live coordinate scaling factor
 LIVE_Y_COORDINATE_SCALE_FACTOR = 16.0
 
@@ -404,52 +418,54 @@ def generate_svg_map_image(data: Dict[str, Any], historical_file_path: str | Non
         rotation: Rotation angle in degrees (0, 90, 180, or 270) - required
     """
     
-    # Create SVG document
-    svg_lines = create_svg_document(MAP_IMAGE_WIDTH, MAP_IMAGE_HEIGHT, COLORS_SVG['background'])
-    
+    # Create SVG document with off-white background
+    svg_lines = create_svg_document(MAP_IMAGE_WIDTH, MAP_IMAGE_HEIGHT, '#f5f5f0')
+
     try:
         # Collect all coordinate points for bounds calculation
         all_points = []
-        
+
         # Plot map data as the main mowing path
         map_items = data.get("map", [])
-        segments = []
-        track_segments: List[List[List[int]]] = []
-        
+        # Per-zone data: list of (zone_segments, zone_track_segments, name) tuples
+        zone_data: List[Tuple[List[List[List[int]]], List[List[List[int]]], str]] = []
+
         if map_items:
-            # The map data is a list of dictionaries, each with a 'data' key
-            # Process each map item separately to preserve zone boundaries
             for i, item in enumerate(map_items):
                 item_data = item.get("data", [])
                 item_track = item.get("track", [])
-                
-                # Add points for bounds calculation
+                item_name = item.get("name", "")
+
                 all_points.extend(item_data)
                 all_points.extend(item_track)
-                
-                # Parse main mowing path from "data" - split by sentinel values within each item
+
+                # Parse boundary segments from "data" (split by sentinel)
+                zone_segments: List[List[List[int]]] = []
                 current_segment: List[List[int]] = []
                 for point in item_data:
                     if point[0] == 2147483647 and point[1] == 2147483647:
                         if len(current_segment) > 1:
-                            segments.append(current_segment)
+                            zone_segments.append(current_segment)
                         current_segment = []
                     else:
                         current_segment.append(point)
                 if len(current_segment) > 1:
-                    segments.append(current_segment)
-                
-                # Parse additional path from "track" - split by sentinel values within each item
+                    zone_segments.append(current_segment)
+
+                # Parse track segments from "track" (split by sentinel)
+                zone_track_segments: List[List[List[int]]] = []
                 current_track_segment: List[List[int]] = []
                 for point in item_track:
                     if point[0] == 2147483647 and point[1] == 2147483647:
                         if len(current_track_segment) > 1:
-                            track_segments.append(current_track_segment)
+                            zone_track_segments.append(current_track_segment)
                         current_track_segment = []
                     else:
                         current_track_segment.append(point)
                 if len(current_track_segment) > 1:
-                    track_segments.append(current_track_segment)
+                    zone_track_segments.append(current_track_segment)
+
+                zone_data.append((zone_segments, zone_track_segments, item_name))
 
         # Add obstacle points
         obstacles = data.get("obstacle", [])
@@ -472,33 +488,46 @@ def generate_svg_map_image(data: Dict[str, Any], historical_file_path: str | Non
                 all_points.append(mower_position)
 
         if not all_points:
-            # No data to display - show message
             svg_lines.append(f'<text x="{MAP_IMAGE_WIDTH // 2}" y="{MAP_IMAGE_HEIGHT // 2}" font-family="Arial, sans-serif" font-size="16" fill="{COLORS_SVG["text_color"]}" text-anchor="middle">No map data available</text>')
         else:
-            # Calculate coordinate bounds
             bounds = calculate_bounds(all_points)
-            
-            # Start rotation group if rotation is specified (only for map content)
+
+            # Start rotation group if rotation is specified
             if rotation in [90, 180, 270]:
                 center_x = MAP_IMAGE_WIDTH // 2
                 center_y = MAP_IMAGE_HEIGHT // 2
                 svg_lines.append(f'<g transform="rotate({rotation}, {center_x}, {center_y})">')
-            
-            # Draw main mowing path segments (map boundary)
-            if segments:
-                boundary_path = svg_path_from_segments(segments, bounds, MAP_IMAGE_WIDTH, MAP_IMAGE_HEIGHT,
-                                                     COLORS_SVG['map_boundary'], 2)
-                if boundary_path:
-                    svg_lines.append(boundary_path)
 
-            # Draw additional path from "track" (mowing path)
-            if track_segments:
-                track_path = svg_path_from_segments(track_segments, bounds, MAP_IMAGE_WIDTH, MAP_IMAGE_HEIGHT,
-                                                  COLORS_SVG['mowing_path'], 2)
-                if track_path:
-                    svg_lines.append(track_path)
+            # 1. Draw zone fills (behind everything else)
+            multi_zone = len(zone_data) > 1
+            for i, (z_segs, _z_tracks, _z_name) in enumerate(zone_data):
+                if not z_segs or not multi_zone:
+                    continue
+                fill_color, outline_color = ZONE_COLORS[i % len(ZONE_COLORS)]
+                for seg in z_segs:
+                    if len(seg) >= 3:
+                        poly = svg_polygon(seg, bounds, MAP_IMAGE_WIDTH, MAP_IMAGE_HEIGHT,
+                                           fill_color, outline_color)
+                        if poly:
+                            svg_lines.append(poly)
 
-            # Draw obstacles
+            # 2. Draw zone boundary outlines
+            for i, (z_segs, _z_tracks, _z_name) in enumerate(zone_data):
+                if z_segs:
+                    color = ZONE_COLORS[i % len(ZONE_COLORS)][1] if multi_zone else COLORS_SVG['map_boundary']
+                    boundary_path = svg_path_from_segments(z_segs, bounds, MAP_IMAGE_WIDTH, MAP_IMAGE_HEIGHT, color, 2)
+                    if boundary_path:
+                        svg_lines.append(boundary_path)
+
+            # 3. Draw mowing tracks per zone
+            for i, (_z_segs, z_tracks, _z_name) in enumerate(zone_data):
+                if z_tracks:
+                    color = ZONE_COLORS[i % len(ZONE_COLORS)][1] if multi_zone else COLORS_SVG['mowing_path']
+                    track_path = svg_path_from_segments(z_tracks, bounds, MAP_IMAGE_WIDTH, MAP_IMAGE_HEIGHT, color, 2)
+                    if track_path:
+                        svg_lines.append(track_path)
+
+            # 4. Draw obstacles
             for obstacle in obstacles:
                 obstacle_data = obstacle.get("data", [])
                 if obstacle_data:
@@ -507,69 +536,62 @@ def generate_svg_map_image(data: Dict[str, Any], historical_file_path: str | Non
                     if obstacle_polygon:
                         svg_lines.append(obstacle_polygon)
 
-            # Draw trajectory (outer path) - using dashed line
+            # 5. Draw trajectory (navigation path) - using dashed line
             for trajectory in trajectories:
                 trajectory_data = trajectory.get("data", [])
                 if trajectory_data:
                     trajectory_path = svg_dashed_path(trajectory_data, bounds, MAP_IMAGE_WIDTH, MAP_IMAGE_HEIGHT,
-                                                    COLORS_SVG['trajectory'], 3)
+                                                    '#b4b4b4', 2)
                     if trajectory_path:
                         svg_lines.append(trajectory_path)
 
-            # Draw current mower position
+            # 6. Draw zone labels
+            for i, (z_segs, _z_tracks, z_name) in enumerate(zone_data):
+                if not z_name or not z_segs:
+                    continue
+                # Compute centroid from all boundary points in this zone
+                all_zone_pts = [pt for seg in z_segs for pt in seg]
+                if len(all_zone_pts) < 3:
+                    continue
+                cx = sum(p[0] for p in all_zone_pts) // len(all_zone_pts)
+                cy = sum(p[1] for p in all_zone_pts) // len(all_zone_pts)
+                px, py = coord_to_pixel(cx, cy, bounds, MAP_IMAGE_WIDTH, MAP_IMAGE_HEIGHT)
+                svg_lines.append(
+                    f'<text x="{px}" y="{py}" font-family="Arial, sans-serif" font-size="14" '
+                    f'fill="{ZONE_LABEL_COLOR}" text-anchor="middle" dominant-baseline="central">'
+                    f'{z_name}</text>'
+                )
+
+            # 7. Draw current mower position
             if mower_position:
                 mower_circle = svg_circle(mower_position[0], mower_position[1], bounds,
                                         MAP_IMAGE_WIDTH, MAP_IMAGE_HEIGHT, 6,
                                         COLORS_SVG['current_position'], COLORS_SVG['text_color'])
                 svg_lines.append(mower_circle)
-            
+
             # Close rotation group if it was opened
             if rotation in [90, 180, 270]:
                 svg_lines.append('</g>')
-        
+
         # Draw title (outside rotation group)
         import os
         if historical_file_path:
             title = f"Dreame Mower Map (Historical: {os.path.basename(historical_file_path)})"
         else:
             title = "Dreame Mower Map (Current)"
-        
+
         svg_lines.append(f'<text x="{MAP_IMAGE_WIDTH // 2}" y="30" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="{COLORS_SVG["text_color"]}" text-anchor="middle">{title}</text>')
-        
-        # Add legend in top left
-        legend_x = 20
-        legend_y = 50
-        legend_items = []
-        
-        if segments:
-            legend_items.append(("Map Boundary", COLORS_SVG['map_boundary']))
-        if track_segments:
-            legend_items.append(("Mowing Path", COLORS_SVG['mowing_path']))
-        if obstacles:
-            legend_items.append(("Obstacles", COLORS_SVG['obstacle']))
-        if trajectories:
-            legend_items.append(("Trajectory", COLORS_SVG['trajectory']))
-        if mower_position:
-            legend_items.append(("Mower Position", COLORS_SVG['current_position']))
-        
-        for i, (label, color) in enumerate(legend_items):
-            y_pos = legend_y + i * 20
-            # Draw color indicator
-            svg_lines.append(f'<rect x="{legend_x}" y="{y_pos}" width="15" height="10" fill="{color}"/>')
-            # Draw label
-            svg_lines.append(f'<text x="{legend_x + 20}" y="{y_pos + 8}" font-family="Arial, sans-serif" font-size="10" fill="{COLORS_SVG["text_color"]}">{label}</text>')
-        
+
         # Add timestamp from map data (use 'start' timestamp if available)
         start_timestamp = data.get("start")
         if start_timestamp:
-            # Use UTC to ensure consistent timestamps across different timezones
             from datetime import timezone
             timestamp = datetime.fromtimestamp(start_timestamp, tz=timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
             timestamp_text = f"Started: {timestamp}"
         else:
             timestamp_text = "No time information"
         timestamp_bg = svg_text_with_background(timestamp_text, 10, MAP_IMAGE_HEIGHT - 25, 10,
-                                              COLORS_SVG['text_color'], COLORS_SVG['background'], 3)
+                                              COLORS_SVG['text_color'], '#f5f5f0', 3)
         svg_lines.append(timestamp_bg)
 
     except Exception as ex:
@@ -582,159 +604,3 @@ def generate_svg_map_image(data: Dict[str, Any], historical_file_path: str | Non
     svg_content = finish_svg_document(svg_lines)
     result_bytes = svg_content.encode('utf-8')
     return result_bytes
-
-
-# Zone fill colors — soft pastels matching the Dreame app palette
-_ZONE_COLORS = [
-    ('#a4d291c8', '#86be73'),  # Green (fill with alpha, outline)
-    ('#a0c8dcc8', '#82aac8'),  # Blue
-    ('#f0c8aac8', '#dcaf8c'),  # Beige/tan
-    ('#f0b4b4c8', '#dc9696'),  # Pink/salmon
-    ('#e6dca0c8', '#d2c882'),  # Yellow
-    ('#beaadcc8', '#aa91c8'),  # Purple
-    ('#aad7d2c8', '#8cc3be'),  # Teal
-    ('#dcbea0c8', '#c8a582'),  # Warm brown
-]
-_FORBIDDEN_FILL = '#c83232c8'
-_FORBIDDEN_OUTLINE = '#c83232'
-_NAV_PATH_COLOR = '#b4b4b4c8'
-_MOW_PATH_COLOR = '#327832b4'
-_ZONE_LABEL_COLOR = '#3c3c3c'
-
-
-def generate_svg_vector_map(vector_map, rotation: int) -> bytes:
-    """Generate SVG map image from MowerVectorMap data (batch API zones/paths).
-
-    Args:
-        vector_map: MowerVectorMap instance with zones, paths, boundary, etc.
-        rotation: Rotation angle in degrees (0, 90, 180, or 270)
-
-    Returns:
-        SVG image as bytes.
-    """
-    svg_lines = create_svg_document(MAP_IMAGE_WIDTH, MAP_IMAGE_HEIGHT, COLORS_SVG['background'])
-
-    try:
-        if not vector_map or not vector_map.boundary:
-            svg_lines.append(
-                f'<text x="{MAP_IMAGE_WIDTH // 2}" y="{MAP_IMAGE_HEIGHT // 2}" '
-                f'font-family="Arial, sans-serif" font-size="16" fill="{COLORS_SVG["text_color"]}" '
-                f'text-anchor="middle">No vector map data available</text>'
-            )
-            svg_content = finish_svg_document(svg_lines)
-            return svg_content.encode('utf-8')
-
-        boundary = vector_map.boundary
-
-        # Collect all points for bounds — use boundary corners plus zone paths
-        all_points: List[List[int]] = [
-            [boundary.x1, boundary.y1],
-            [boundary.x2, boundary.y2],
-        ]
-        for zone in vector_map.zones:
-            for x, y in zone.path:
-                all_points.append([x, y])
-
-        bounds = calculate_bounds(all_points)
-
-        # Start rotation group if needed
-        if rotation in [90, 180, 270]:
-            center_x = MAP_IMAGE_WIDTH // 2
-            center_y = MAP_IMAGE_HEIGHT // 2
-            svg_lines.append(f'<g transform="rotate({rotation}, {center_x}, {center_y})">')
-
-        # 1. Draw zone fills
-        for i, zone in enumerate(vector_map.zones):
-            if len(zone.path) < 3:
-                continue
-            fill_color, outline_color = _ZONE_COLORS[i % len(_ZONE_COLORS)]
-            points = [[x, y] for x, y in zone.path]
-            poly = svg_polygon(points, bounds, MAP_IMAGE_WIDTH, MAP_IMAGE_HEIGHT, fill_color, outline_color)
-            if poly:
-                svg_lines.append(poly)
-
-        # 2. Draw forbidden areas
-        for zone in vector_map.forbidden_areas:
-            if len(zone.path) < 3:
-                continue
-            points = [[x, y] for x, y in zone.path]
-            poly = svg_polygon(points, bounds, MAP_IMAGE_WIDTH, MAP_IMAGE_HEIGHT, _FORBIDDEN_FILL, _FORBIDDEN_OUTLINE)
-            if poly:
-                svg_lines.append(poly)
-
-        # 3. Draw mowing paths (trails)
-        for mow_path in vector_map.mow_paths:
-            segments = [[[x, y] for x, y in seg] for seg in mow_path.segments if len(seg) >= 2]
-            if segments:
-                path_el = svg_path_from_segments(segments, bounds, MAP_IMAGE_WIDTH, MAP_IMAGE_HEIGHT, _MOW_PATH_COLOR, 2)
-                if path_el:
-                    svg_lines.append(path_el)
-
-        # 4. Draw navigation paths between zones
-        for nav_path in vector_map.paths:
-            if len(nav_path.path) < 2:
-                continue
-            segments = [[[x, y] for x, y in nav_path.path]]
-            path_el = svg_path_from_segments(segments, bounds, MAP_IMAGE_WIDTH, MAP_IMAGE_HEIGHT, _NAV_PATH_COLOR, 2)
-            if path_el:
-                svg_lines.append(path_el)
-
-        # 5. Draw zone labels
-        for zone in vector_map.zones:
-            if not zone.name or len(zone.path) < 3:
-                continue
-            cx = sum(x for x, y in zone.path) // len(zone.path)
-            cy = sum(y for x, y in zone.path) // len(zone.path)
-            px, py = coord_to_pixel(cx, cy, bounds, MAP_IMAGE_WIDTH, MAP_IMAGE_HEIGHT)
-            svg_lines.append(
-                f'<text x="{px}" y="{py}" font-family="Arial, sans-serif" font-size="14" '
-                f'fill="{_ZONE_LABEL_COLOR}" text-anchor="middle" dominant-baseline="central">'
-                f'{zone.name}</text>'
-            )
-
-        # Close rotation group
-        if rotation in [90, 180, 270]:
-            svg_lines.append('</g>')
-
-        # Title
-        title = "Dreame Mower Zone Map"
-        if vector_map.name:
-            title += f" ({vector_map.name})"
-        svg_lines.append(
-            f'<text x="{MAP_IMAGE_WIDTH // 2}" y="30" font-family="Arial, sans-serif" '
-            f'font-size="16" font-weight="bold" fill="{COLORS_SVG["text_color"]}" '
-            f'text-anchor="middle">{title}</text>'
-        )
-
-        # Legend
-        legend_x = 20
-        legend_y = 50
-        legend_items = []
-        if vector_map.zones:
-            legend_items.append(("Zones", _ZONE_COLORS[0][0]))
-        if vector_map.forbidden_areas:
-            legend_items.append(("Forbidden", _FORBIDDEN_FILL))
-        if vector_map.mow_paths:
-            legend_items.append(("Mow Path", _MOW_PATH_COLOR))
-        if vector_map.paths:
-            legend_items.append(("Nav Path", _NAV_PATH_COLOR))
-
-        for i, (label, color) in enumerate(legend_items):
-            y_pos = legend_y + i * 20
-            svg_lines.append(f'<rect x="{legend_x}" y="{y_pos}" width="15" height="10" fill="{color}"/>')
-            svg_lines.append(
-                f'<text x="{legend_x + 20}" y="{y_pos + 8}" font-family="Arial, sans-serif" '
-                f'font-size="10" fill="{COLORS_SVG["text_color"]}">{label}</text>'
-            )
-
-    except Exception as ex:
-        _LOGGER.error("Error generating vector map SVG: %s", ex, exc_info=True)
-        error_text = f"Error generating vector map: {str(ex)}"
-        svg_lines.append(
-            f'<text x="{MAP_IMAGE_WIDTH // 2}" y="{MAP_IMAGE_HEIGHT // 2}" '
-            f'font-family="Arial, sans-serif" font-size="14" fill="{COLORS_SVG["current_position"]}" '
-            f'text-anchor="middle">{error_text}</text>'
-        )
-
-    svg_content = finish_svg_document(svg_lines)
-    return svg_content.encode('utf-8')

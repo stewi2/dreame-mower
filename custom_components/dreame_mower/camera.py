@@ -19,7 +19,8 @@ from .entity import DreameMowerEntity
 
 from .dreame.const import STATUS_PROPERTY, map_status_to_activity, POSE_COVERAGE_PROPERTY
 from .dreame.property.pose_coverage import POSE_COVERAGE_COORDINATES_PROPERTY_NAME
-from .dreame.svg_map_generator import generate_svg_live_image, generate_svg_map_image, generate_svg_vector_map
+from .dreame.map_data_parser import vector_map_to_map_data
+from .dreame.svg_map_generator import generate_svg_live_image, generate_svg_map_image
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -85,11 +86,9 @@ class DreameMowerCameraEntity(DreameMowerEntity, Camera):
         """Called when entity is added to Home Assistant."""
         await super().async_added_to_hass()
 
-        # Build initial historical files cache now that hass is available
-        self.hass.create_task(self._refresh_historical_files_cache())
-
-        # Fetch vector map from batch API (provides zone map even without historical files)
-        self.hass.create_task(self._async_fetch_vector_map())
+        # Build historical files cache first, then render from historical data
+        # or fall back to batch API vector map
+        self.hass.create_task(self._async_initial_image_load())
 
         # If not docked, request initial pose coverage property and start timer
         if not self._docked:
@@ -106,6 +105,14 @@ class DreameMowerCameraEntity(DreameMowerEntity, Camera):
         # Ensure timer is stopped and cleaned up
         self._stop_pose_coverage_timer()
         await super().async_will_remove_from_hass()
+
+    async def _async_initial_image_load(self) -> None:
+        """Load initial image: prefer historical files, fall back to batch API vector map."""
+        await self._refresh_historical_files_cache()
+        if self._historical_files_cache:
+            await self._async_update_image()
+        else:
+            await self._async_fetch_vector_map()
 
     async def _async_fetch_vector_map(self) -> None:
         """Fetch vector map data from batch API in background."""
@@ -408,10 +415,12 @@ class DreameMowerCameraEntity(DreameMowerEntity, Camera):
             return
 
         try:
+            data = vector_map_to_map_data(vector_map)
             loop = asyncio.get_event_loop()
             self._image_bytes = await loop.run_in_executor(
                 None,
-                lambda: generate_svg_vector_map(vector_map, rotation=self._current_rotation)
+                self._generate_map_image,
+                data,
             )
         except Exception as ex:
             _LOGGER.error("Failed to generate vector map image: %s", ex)
