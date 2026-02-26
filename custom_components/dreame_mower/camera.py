@@ -20,7 +20,7 @@ from .entity import DreameMowerEntity
 from .dreame.const import STATUS_PROPERTY, map_status_to_activity, POSE_COVERAGE_PROPERTY
 from .dreame.property.pose_coverage import POSE_COVERAGE_COORDINATES_PROPERTY_NAME
 from .dreame.map_data_parser import vector_map_to_map_data
-from .dreame.svg_map_generator import generate_svg_live_image, generate_svg_map_image
+from .dreame.svg_map_generator import generate_svg_map_image
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -63,7 +63,6 @@ class DreameMowerCameraEntity(DreameMowerEntity, Camera):
 
         # Live mode state
         self._live_coordinates: list[dict[str, Any]] = []  # Current session live coordinates
-        self._base_map_boundary: list[list[int]] = []  # Base map boundary from previous session
         
         # Periodic property request timer for live mode
         self._pose_coverage_timer: Timer | None = None
@@ -280,10 +279,6 @@ class DreameMowerCameraEntity(DreameMowerEntity, Camera):
     def _handle_live_coordinates_update(self, coordinates_data: dict[str, Any]) -> None:
         """Handle live coordinate updates during mowing session."""
         try:
-            # If not in live mode yet, switch to live mode (new session starting)
-            if not self._live_coordinates:
-                self._extract_base_map_boundary()
-            
             # Add coordinates to live tracking
             self._live_coordinates.append(coordinates_data)
             
@@ -297,27 +292,6 @@ class DreameMowerCameraEntity(DreameMowerEntity, Camera):
                             
         except Exception as ex:
             _LOGGER.error("Error handling live coordinates update: %s", ex)
-
-    def _extract_base_map_boundary(self) -> None:
-        """Extract base map boundary from current map data for live mode overlay."""
-        try:
-            self._base_map_boundary.clear()
-            
-            if not self._current_map_data:
-                return
-                
-            map_items = self._current_map_data["map"]
-            all_boundary_points = []
-            for item in map_items:
-                item_data = item.get("data", [])
-                for point in item_data:
-                    if point[0] != 2147483647 and point[1] != 2147483647:
-                        all_boundary_points.append(point)
-            
-            self._base_map_boundary = all_boundary_points
-                        
-        except Exception as ex:
-            _LOGGER.error("Error extracting base map boundary: %s", ex)
 
     async def _async_update_live_image(self) -> None:
         """Update camera image with live coordinates overlay."""
@@ -336,13 +310,20 @@ class DreameMowerCameraEntity(DreameMowerEntity, Camera):
             _LOGGER.error("Failed to update live image: %s", ex)
 
     def _generate_live_image(self) -> bytes:
-        """Generate live map image in SVG format with current coordinates overlay."""
-        return generate_svg_live_image(
-            self._live_coordinates,
-            self._base_map_boundary,
-            self._current_map_data,
-            self.coordinator,
-            rotation=self._current_rotation
+        """Generate live map image in SVG format with current coordinates overlay on vector map."""
+        # Prefer vector map from batch API — same coordinate system as live pose data.
+        # Historical map data uses a different (higher-resolution) coordinate system.
+        vector_map = self.coordinator.device.vector_map
+        if vector_map and vector_map.boundary:
+            data = vector_map_to_map_data(vector_map)
+        elif self._current_map_data:
+            data = self._current_map_data
+        else:
+            data = {}
+        return generate_svg_map_image(
+            data, None, self.coordinator,
+            rotation=self._current_rotation,
+            live_coordinates=self._live_coordinates
         )
 
     @property
