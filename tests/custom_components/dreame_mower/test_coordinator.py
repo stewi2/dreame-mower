@@ -74,10 +74,10 @@ async def test_coordinator_async_update_data(hass: HomeAssistant, minimal_config
 async def test_coordinator_initial_data_fetch(hass: HomeAssistant, minimal_config_entry):
     """Test coordinator can fetch initial data without errors."""
     coordinator = DreameMowerCoordinator(hass, entry=minimal_config_entry)
-    
-    # This should not raise any exceptions
-    await coordinator.async_config_entry_first_refresh()
-    
+
+    # Call _async_update_data directly to avoid the ConfigEntryState.SETUP_IN_PROGRESS
+    coordinator.data = await coordinator._async_update_data()
+
     # Data should be available after first refresh
     assert coordinator.data is not None
     assert coordinator.data["name"] == "Test Mower"
