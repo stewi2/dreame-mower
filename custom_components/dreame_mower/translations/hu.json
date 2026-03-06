@@ -39,11 +39,12 @@
       }
     },
     "error": {
-      "cannot_connect": "Nem sikerült csatlakozni.",
-      "unsupported": "Az eszközt nem támogatják",
-      "credentials_incomplete": "A hitelesítő adatok hiányosak, kérjük, töltse ki a felhasználónevet, a jelszót és az országot",
-      "login_error": "Nem tudott bejelentkezni, ellenőrizze a hitelesítő adatokat.",
-      "no_devices": "A kiválasztott országban nem található támogatott eszköz."
+      "cannot_connect": "Kapcsolódás sikertelen. Ellenőrizze a hálózatát, és próbálja újra. Részletekért tekintse meg a Home Assistant naplóit.",
+      "unsupported": "Ezt az eszközmodellt az integráció nem támogatja.",
+      "credentials_incomplete": "Felhasználónév, jelszó és ország megadása kötelező.",
+      "login_error": "Bejelentkezés sikertelen. Ellenőrizze felhasználónevét és jelszavát. Győződjön meg arról, hogy a megfelelő fióktípust választotta (Dreamehome vs MOVAhome).",
+      "no_devices": "Nem található támogatott fűnyíró ebben a fiókban. Győződjön meg arról, hogy az eszköz hozzá van adva az alkalmazásához, és szükség esetén próbáljon meg egy másik szerverországot.",
+      "invalid_account_type": "Érvénytelen fióktípus van kiválasztva."
     },
     "abort": {
       "cannot_connect": "Nem sikerült csatlakozni."

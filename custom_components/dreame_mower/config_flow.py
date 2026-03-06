@@ -168,9 +168,15 @@ class DreameMowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     )
                     await self.hass.async_add_executor_job(auth.connect)
 
-                    if auth.connected is False:
+                    if not auth.connected:
+                        _LOGGER.warning(
+                            "Login failed for account_type=%s, country=%s, username=%s",
+                            account_type,
+                            self.country,
+                            self.username,
+                        )
                         errors["base"] = "login_error"
-                    elif auth.connected:
+                    else:
                         devices = await self.hass.async_add_executor_job(
                             auth.get_devices
                         )
@@ -207,7 +213,7 @@ class DreameMowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
                         errors["base"] = "no_devices"
                 except Exception as ex:
-                    _LOGGER.error("Error connecting to cloud service: %s", ex)
+                    _LOGGER.exception("Error connecting to cloud service: %s", ex)
                     errors["base"] = "cannot_connect"
             else:
                 errors["base"] = "credentials_incomplete"
@@ -269,7 +275,7 @@ class DreameMowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 raise ConnectionError("Failed to connect to cloud service")
                 
         except Exception as ex:
-            _LOGGER.error("Cannot connect to device: %s", ex)
+            _LOGGER.exception("Cannot connect to device: %s", ex)
             errors["base"] = "cannot_connect"
 
         if not errors:

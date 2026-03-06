@@ -39,11 +39,12 @@
       }
     },
     "error": {
-      "cannot_connect": "Nie udało się połączyć.",
-      "unsupported": "Urządzenie nie jest obsługiwane",
-      "credentials_incomplete": "Poświadczenia niekompletne, wypełnij nazwę użytkownika, hasło i kraj",
-      "login_error": "Nie można się zalogować, sprawdzić poświadczenia.",
-      "no_devices": "Brak obsługiwanych urządzeń znalezionych na tym koncie w wybranym kraju."
+      "cannot_connect": "Połączenie nie powiodło się. Sprawdź sieć i spróbuj ponownie. Szczegóły znajdziesz w dziennikach Home Assistant.",
+      "unsupported": "Ten model urządzenia nie jest obsługiwany przez tę integrację.",
+      "credentials_incomplete": "Nazwa użytkownika, hasło i kraj są wymagane.",
+      "login_error": "Logowanie nie powiodło się. Sprawdź nazwę użytkownika i hasło. Upewnij się, że wybrałeś właściwy typ konta (Dreamehome vs MOVAhome).",
+      "no_devices": "Nie znaleziono obsługiwanej kosiarki na tym koncie. Upewnij się, że urządzenie zostało dodane do aplikacji i w razie potrzeby spróbuj innego kraju serwera.",
+      "invalid_account_type": "Wybrano nieprawidłowy typ konta."
     },
     "abort": {
       "cannot_connect": "Nie udało się połączyć."

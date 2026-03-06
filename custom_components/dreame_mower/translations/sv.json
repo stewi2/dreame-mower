@@ -39,11 +39,12 @@
       }
     },
     "error": {
-      "cannot_connect": "Misslyckades med att ansluta.",
-      "unsupported": "Enheten stöds inte",
-      "credentials_incomplete": "Bevisar ofullständiga, fyll i användarnamn, lösenord och land",
-      "login_error": "Kunde inte logga in, kontrollera referenser.",
-      "no_devices": "Inga enheter som stöds i detta konto på utvalt land."
+      "cannot_connect": "Anslutning misslyckades. Kontrollera ditt nätverk och försök igen. Se Home Assistant-loggar för detaljer.",
+      "unsupported": "Denna enhetsmodell stöds inte av denna integration.",
+      "credentials_incomplete": "Användarnamn, lösenord och land är obligatoriska.",
+      "login_error": "Inloggning misslyckades. Kontrollera ditt användarnamn och lösenord. Se till att du har valt rätt kontotyp (Dreamehome vs MOVAhome).",
+      "no_devices": "Ingen kompatibel gräsklippare hittades i detta konto. Se till att enheten är tillagd i din app och prova ett annat serverland om det behövs.",
+      "invalid_account_type": "Ogiltigt kontotyp valt."
     },
     "abort": {
       "cannot_connect": "Misslyckades med att ansluta."

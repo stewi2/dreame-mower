@@ -39,11 +39,12 @@
       }
     },
     "error": {
-      "cannot_connect": "Échec de la connexion.",
-      "unsupported": "L'appareil n'est pas pris en charge",
-      "credentials_incomplete": "Informations incomplètes, veuillez remplir le nom d'utilisateur, le mot de passe et le pays",
-      "login_error": "La connexion a échoué, vérifier les informations d'identification.",
-      "no_devices": "Aucun dispositif pris en charge trouvé dans ce compte sur le pays sélectionné."
+      "cannot_connect": "Échec de la connexion. Vérifiez votre réseau et réessayez. Consultez les journaux Home Assistant pour plus de détails.",
+      "unsupported": "Ce modèle d'appareil n'est pas pris en charge par cette intégration.",
+      "credentials_incomplete": "Le nom d'utilisateur, le mot de passe et le pays sont obligatoires.",
+      "login_error": "Échec de la connexion. Vérifiez votre nom d'utilisateur et mot de passe. Assurez-vous d'avoir sélectionné le bon type de compte (Dreamehome vs MOVAhome).",
+      "no_devices": "Aucune tondeuse compatible trouvée dans ce compte. Assurez-vous que l'appareil est ajouté à votre application et essayez un autre pays si nécessaire.",
+      "invalid_account_type": "Type de compte invalide sélectionné."
     },
     "abort": {
       "cannot_connect": "Échec de la connexion."

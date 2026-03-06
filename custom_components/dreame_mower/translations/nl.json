@@ -39,11 +39,12 @@
       }
     },
     "error": {
-      "cannot_connect": "Kan geen verbinding maken.",
-      "unsupported": "Apparaat wordt niet ondersteund",
-      "credentials_incomplete": "Referenties onvolledig, vul de gebruikersnaam, het wachtwoord en het land in",
-      "login_error": "Kon niet inloggen, de inloggegevens controleren.",
-      "no_devices": "Geen ondersteunde apparaten gevonden in dit account op het geselecteerde land."
+      "cannot_connect": "Verbinding mislukt. Controleer uw netwerk en probeer opnieuw. Zie de Home Assistant-logboeken voor details.",
+      "unsupported": "Dit apparaatmodel wordt niet ondersteund door deze integratie.",
+      "credentials_incomplete": "Gebruikersnaam, wachtwoord en land zijn verplicht.",
+      "login_error": "Aanmelden mislukt. Controleer uw gebruikersnaam en wachtwoord. Zorg ervoor dat u het juiste accounttype hebt geselecteerd (Dreamehome vs MOVAhome).",
+      "no_devices": "Geen ondersteunde grasmaaier gevonden in dit account. Zorg ervoor dat het apparaat is toegevoegd aan uw app en probeer een ander serverland indien nodig.",
+      "invalid_account_type": "Ongeldig accounttype geselecteerd."
     },
     "abort": {
       "cannot_connect": "Kan geen verbinding maken."

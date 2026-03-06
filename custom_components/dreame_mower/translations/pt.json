@@ -39,11 +39,12 @@
       }
     },
     "error": {
-      "cannot_connect": "Falhou em conectar.",
-      "unsupported": "O dispositivo não é suportado",
-      "credentials_incomplete": "Credenciais incompletas, preencha o nome de usuário, senha e país",
-      "login_error": "Não foi possível fazer login, verifique as credenciais.",
-      "no_devices": "Nenhum dispositivo suportado encontrado nesta conta no país selecionado."
+      "cannot_connect": "Falha na ligação. Verifique a sua rede e tente novamente. Consulte os registos do Home Assistant para mais detalhes.",
+      "unsupported": "Este modelo de dispositivo não é suportado por esta integração.",
+      "credentials_incomplete": "Nome de utilizador, palavra-passe e país são obrigatórios.",
+      "login_error": "Falha no início de sessão. Verifique o nome de utilizador e a palavra-passe. Certifique-se de que selecionou o tipo de conta correto (Dreamehome vs MOVAhome).",
+      "no_devices": "Nenhum corta-relva compatível encontrado nesta conta. Certifique-se de que o dispositivo foi adicionado à sua aplicação e tente outro país de servidor se necessário.",
+      "invalid_account_type": "Tipo de conta inválido selecionado."
     },
     "abort": {
       "cannot_connect": "Falhou em conectar."

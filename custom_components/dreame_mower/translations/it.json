@@ -39,11 +39,12 @@
       }
     },
     "error": {
-      "cannot_connect": "Impossibile connettersi.",
-      "unsupported": "Il dispositivo non è supportato",
-      "credentials_incomplete": "Credenziali incomplete, compila nome utente, password e paese",
-      "login_error": "Impossibile accedere, controllare le credenziali.",
-      "no_devices": "Nessun dispositivo supportato trovati in questo account in paese selezionato."
+      "cannot_connect": "Connessione non riuscita. Controlla la rete e riprova. Consulta i log di Home Assistant per i dettagli.",
+      "unsupported": "Questo modello di dispositivo non è supportato da questa integrazione.",
+      "credentials_incomplete": "Nome utente, password e paese sono obbligatori.",
+      "login_error": "Accesso non riuscito. Controlla nome utente e password. Assicurati di aver selezionato il tipo di account corretto (Dreamehome vs MOVAhome).",
+      "no_devices": "Nessun rasaerba supportato trovato in questo account. Assicurati che il dispositivo sia aggiunto alla tua app e prova un paese server diverso se necessario.",
+      "invalid_account_type": "Tipo di account non valido selezionato."
     },
     "abort": {
       "cannot_connect": "Impossibile connettersi."

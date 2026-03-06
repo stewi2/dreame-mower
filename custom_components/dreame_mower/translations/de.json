@@ -39,11 +39,12 @@
       }
     },
     "error": {
-      "cannot_connect": "Fehlgeschlagene Verbindung.",
-      "unsupported": "Das Gerät wird nicht unterstützt",
-      "credentials_incomplete": "Unvollständige Anmeldeinformationen, bitte füllen Sie Benutzername, Passwort und Land aus",
-      "login_error": "Es konnte sich nicht anmelden, überprüfen Sie die Anmeldeinformationen.",
-      "no_devices": "Keine unterstützten Geräte in diesem Konto in ausgewähltem Land."
+      "cannot_connect": "Verbindung fehlgeschlagen. Überprüfen Sie Ihr Netzwerk und versuchen Sie es erneut. Weitere Details finden Sie in den Home Assistant-Protokollen.",
+      "unsupported": "Dieses Gerätemodell wird von dieser Integration nicht unterstützt.",
+      "credentials_incomplete": "Benutzername, Passwort und Land sind erforderlich.",
+      "login_error": "Anmeldung fehlgeschlagen. Überprüfen Sie Benutzername und Passwort. Stellen Sie sicher, dass Sie den richtigen Kontotyp ausgewählt haben (Dreamehome vs. MOVAhome).",
+      "no_devices": "Kein unterstützter Mäher in diesem Konto gefunden. Stellen Sie sicher, dass das Gerät in Ihrer App hinzugefügt ist, und probieren Sie ggf. ein anderes Serverland.",
+      "invalid_account_type": "Ungültiger Kontotyp ausgewählt."
     },
     "abort": {
       "cannot_connect": "Fehlgeschlagene Verbindung."

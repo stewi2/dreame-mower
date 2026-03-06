@@ -39,11 +39,12 @@
       }
     },
     "error": {
-      "cannot_connect": "No se conectó.",
-      "unsupported": "El dispositivo no es compatible",
-      "credentials_incomplete": "Credenciales incompletos, complete el nombre de usuario, la contraseña y el país",
-      "login_error": "No pudo iniciar sesión, verificar las credenciales.",
-      "no_devices": "No se encuentran dispositivos compatibles en esta cuenta en el país seleccionado."
+      "cannot_connect": "Error de conexión. Comprueba tu red e inténtalo de nuevo. Consulta los registros de Home Assistant para más detalles.",
+      "unsupported": "Este modelo de dispositivo no es compatible con esta integración.",
+      "credentials_incomplete": "El nombre de usuario, la contraseña y el país son obligatorios.",
+      "login_error": "Error de inicio de sesión. Comprueba tu nombre de usuario y contraseña. Asegúrate de haber seleccionado el tipo de cuenta correcto (Dreamehome vs MOVAhome).",
+      "no_devices": "No se encontró ninguna cortadora compatible en esta cuenta. Asegúrate de que el dispositivo esté añadido en tu aplicación y prueba con otro país de servidor si es necesario.",
+      "invalid_account_type": "Tipo de cuenta no válido seleccionado."
     },
     "abort": {
       "cannot_connect": "No se conectó."

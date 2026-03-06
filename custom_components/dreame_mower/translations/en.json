@@ -39,11 +39,12 @@
       }
     },
     "error": {
-      "cannot_connect": "Failed to connect.",
-      "unsupported": "Device is not supported",
-      "credentials_incomplete": "Credentials incomplete, please fill in username, password and country",
-      "login_error": "Could not login, check the credentials.",
-      "no_devices": "No supported devices found in this account on selected country."
+      "cannot_connect": "Failed to connect. Check your network and try again. See Home Assistant logs for details.",
+      "unsupported": "Device model is not supported by this integration.",
+      "credentials_incomplete": "Username, password and country are all required.",
+      "login_error": "Login failed. Check your username and password. Make sure you selected the correct account type (Dreamehome vs MOVAhome).",
+      "no_devices": "No supported mower found in this account. Make sure the device is added to your app and try a different server country if needed.",
+      "invalid_account_type": "Invalid account type selected."
     },
     "abort": {
       "cannot_connect": "Failed to connect."
