@@ -47,7 +47,8 @@
       "invalid_account_type": "Ogiltigt kontotyp valt."
     },
     "abort": {
-      "cannot_connect": "Misslyckades med att ansluta."
+      "cannot_connect": "Misslyckades med att ansluta.",
+      "already_configured": "Den här enheten är redan konfigurerad."
     }
   },
   "options": {

@@ -47,7 +47,8 @@
       "invalid_account_type": "Ongeldig accounttype geselecteerd."
     },
     "abort": {
-      "cannot_connect": "Kan geen verbinding maken."
+      "cannot_connect": "Kan geen verbinding maken.",
+      "already_configured": "Dit apparaat is al geconfigureerd."
     }
   },
   "options": {

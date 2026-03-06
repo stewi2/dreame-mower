@@ -47,7 +47,8 @@
       "invalid_account_type": "Выбран недопустимый тип учётной записи."
     },
     "abort": {
-      "cannot_connect": "Не удалось подключиться."
+      "cannot_connect": "Не удалось подключиться.",
+      "already_configured": "Это устройство уже настроено."
     }
   },
   "options": {

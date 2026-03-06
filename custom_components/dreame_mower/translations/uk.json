@@ -47,7 +47,8 @@
       "invalid_account_type": "Вибрано недійсний тип облікового запису."
     },
     "abort": {
-      "cannot_connect": "Не вдалося підключитися."
+      "cannot_connect": "Не вдалося підключитися.",
+      "already_configured": "Цей пристрій вже налаштовано."
     }
   },
   "options": {

@@ -47,7 +47,8 @@
       "invalid_account_type": "Tipo de cuenta no válido seleccionado."
     },
     "abort": {
-      "cannot_connect": "No se conectó."
+      "cannot_connect": "No se conectó.",
+      "already_configured": "Este dispositivo ya está configurado."
     }
   },
   "options": {

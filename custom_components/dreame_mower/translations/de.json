@@ -47,7 +47,8 @@
       "invalid_account_type": "Ungültiger Kontotyp ausgewählt."
     },
     "abort": {
-      "cannot_connect": "Fehlgeschlagene Verbindung."
+      "cannot_connect": "Fehlgeschlagene Verbindung.",
+      "already_configured": "Dieses Gerät ist bereits konfiguriert."
     }
   },
   "options": {

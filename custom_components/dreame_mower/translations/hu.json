@@ -47,7 +47,8 @@
       "invalid_account_type": "Érvénytelen fióktípus van kiválasztva."
     },
     "abort": {
-      "cannot_connect": "Nem sikerült csatlakozni."
+      "cannot_connect": "Nem sikerült csatlakozni.",
+      "already_configured": "Ez az eszköz már konfigurálva van."
     }
   },
   "options": {

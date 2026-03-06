@@ -47,7 +47,8 @@
       "invalid_account_type": "Wybrano nieprawidłowy typ konta."
     },
     "abort": {
-      "cannot_connect": "Nie udało się połączyć."
+      "cannot_connect": "Nie udało się połączyć.",
+      "already_configured": "To urządzenie jest już skonfigurowane."
     }
   },
   "options": {

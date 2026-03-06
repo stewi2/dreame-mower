@@ -14,6 +14,7 @@ from homeassistant.const import (
     CONF_USERNAME,
 )
 from homeassistant.config_entries import ConfigFlowResult, OptionsFlow
+from homeassistant.data_entry_flow import AbortFlow
 from homeassistant.helpers.device_registry import format_mac
 from homeassistant.core import callback
 
@@ -212,6 +213,8 @@ class DreameMowerConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                                 return await self.async_step_devices()
 
                         errors["base"] = "no_devices"
+                except AbortFlow:
+                    raise
                 except Exception as ex:
                     _LOGGER.exception("Error connecting to cloud service: %s", ex)
                     errors["base"] = "cannot_connect"

@@ -47,7 +47,8 @@
       "invalid_account_type": "Tipo de conta inválido selecionado."
     },
     "abort": {
-      "cannot_connect": "Falhou em conectar."
+      "cannot_connect": "Falhou em conectar.",
+      "already_configured": "Este dispositivo já está configurado."
     }
   },
   "options": {
