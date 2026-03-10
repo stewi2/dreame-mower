@@ -19,6 +19,7 @@ from custom_components.dreame_mower.dreame.property.mission_completion import (
     UNKNOWN_FIELD_14,
     UNKNOWN_FIELD_15,
     UNKNOWN_FIELD_60,
+    MAP_NAME_FIELD,
 )
 
 
@@ -108,6 +109,7 @@ class TestMissionCompletionEventHandler:
             UNKNOWN_FIELD_14: 280,
             UNKNOWN_FIELD_15: 2,
             UNKNOWN_FIELD_60: 255,
+            MAP_NAME_FIELD: None,
         })
         
         # Verify individual field notifications for backward compatibility
@@ -158,6 +160,7 @@ class TestMissionCompletionEventHandler:
             UNKNOWN_FIELD_14: None,
             UNKNOWN_FIELD_15: None,
             UNKNOWN_FIELD_60: None,
+            MAP_NAME_FIELD: None,
         })
 
     def test_parse_mission_completion_event_with_extreme_timestamp(self):
@@ -353,6 +356,7 @@ class TestMissionCompletionEventHandler:
             UNKNOWN_FIELD_14: None,
             UNKNOWN_FIELD_15: None,
             UNKNOWN_FIELD_60: None,
+            MAP_NAME_FIELD: None,
         })
 
     def test_data_file_path_variations(self):
@@ -438,6 +442,7 @@ class TestMissionCompletionEventHandler:
             UNKNOWN_FIELD_14: 270,
             UNKNOWN_FIELD_15: -1,
             UNKNOWN_FIELD_60: -1,
+            MAP_NAME_FIELD: None,
         })
         
         # Verify individual field notifications for backward compatibility
@@ -524,3 +529,48 @@ class TestMissionCompletionEventHandler:
         events_with_dt = handler.get_charging_events_with_datetime()
         assert events_with_dt is not None
         assert len(events_with_dt) == 1  # Only valid event included
+
+    def test_parse_mission_completion_event_with_map_name(self):
+        """Test parsing mission completion event with piid 16 (map_name) — as seen in issue #31."""
+        handler = MissionCompletionEventHandler()
+        notify_callback = Mock()
+
+        # Real-world data from issue #31 (mova.mower.g2529b firmware 4.3.6_0169)
+        test_arguments = [
+            {"piid": 1, "value": 102},   # Progress percent
+            {"piid": 2, "value": 23},    # Duration minutes
+            {"piid": 3, "value": 774},   # Area (7.74 m²)
+            {"piid": 7, "value": 2},
+            {"piid": 8, "value": 1772956800},  # Start timestamp
+            {"piid": 9, "value": "ali_dreame/2026/03/08/HJxxxxxx4/-1xxxxxxx4_082338835.0169.json"},
+            {"piid": 11, "value": 1},
+            {"piid": 60, "value": 224},
+            {"piid": 13, "value": []},
+            {"piid": 14, "value": 107},
+            {"piid": 15, "value": 0},
+            {"piid": 16, "value": "map1"},  # New field: map name/identifier
+        ]
+
+        result = handler._parse_mission_completion_event(test_arguments, notify_callback)
+
+        assert result is True
+        assert handler.progress_percent == 102
+        assert handler.duration_minutes == 23
+        assert handler.area_sqm == 7.74
+        assert handler.data_file_path == "ali_dreame/2026/03/08/HJxxxxxx4/-1xxxxxxx4_082338835.0169.json"
+        assert handler.map_name == "map1"
+
+        notify_callback.assert_any_call(MISSION_COMPLETION_EVENT_PROPERTY_NAME, {
+            PROGRESS_FIELD: 102,
+            DURATION_FIELD: 23,
+            AREA_FIELD: 7.74,
+            UNKNOWN_FIELD_7: 2,
+            START_TIMESTAMP_FIELD: 1772956800,
+            DATA_FILE_PATH_FIELD: "ali_dreame/2026/03/08/HJxxxxxx4/-1xxxxxxx4_082338835.0169.json",
+            UNKNOWN_FIELD_11: 1,
+            CHARGING_EVENTS_FIELD: [],
+            UNKNOWN_FIELD_14: 107,
+            UNKNOWN_FIELD_15: 0,
+            UNKNOWN_FIELD_60: 224,
+            MAP_NAME_FIELD: "map1",
+        })

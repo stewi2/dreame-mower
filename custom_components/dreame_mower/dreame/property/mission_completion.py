@@ -38,6 +38,7 @@ CHARGING_EVENTS_FIELD = "charging_events"  # Previously unknown_field_13
 UNKNOWN_FIELD_14 = "unknown_field_14"
 UNKNOWN_FIELD_15 = "unknown_field_15"
 UNKNOWN_FIELD_60 = "unknown_field_60"
+MAP_NAME_FIELD = "map_name"
 
 # Keep old name for backward compatibility
 UNKNOWN_FIELD_13 = CHARGING_EVENTS_FIELD
@@ -63,6 +64,7 @@ class MissionCompletionEventHandler:
         self._charging_events: list | None = None
         self._unknown_field_14: int | None = None  # Purpose unknown - observed values: 270, 280
         self._unknown_field_15: int | None = None  # Purpose unknown - observed values: -1, 2
+        self._map_name: str | None = None  # Map identifier the mission was performed on (e.g. "map1")
         
         # Derived data
         self._start_datetime: datetime | None = None
@@ -131,6 +133,8 @@ class MissionCompletionEventHandler:
                     self._unknown_field_15 = int(value)
                 elif piid == 60:  # Unknown field 60
                     self._unknown_field_60 = int(value)
+                elif piid == 16:  # Map name/identifier
+                    self._map_name = str(value)
                 else:
                     raise ValueError(f"Unknown piid {piid} in mission completion event")
             
@@ -169,6 +173,7 @@ class MissionCompletionEventHandler:
         self._unknown_field_14 = None
         self._unknown_field_15 = None
         self._unknown_field_60 = None
+        self._map_name = None
         self._start_datetime = None
         self._data_file_content = None
     
@@ -186,6 +191,7 @@ class MissionCompletionEventHandler:
             UNKNOWN_FIELD_14: self._unknown_field_14,
             UNKNOWN_FIELD_15: self._unknown_field_15,
             UNKNOWN_FIELD_60: self._unknown_field_60,
+            MAP_NAME_FIELD: self._map_name,
         }
    
     # Properties for direct access
@@ -277,7 +283,12 @@ class MissionCompletionEventHandler:
     def unknown_field_60(self) -> int | None:
         """Return unknown field 60 value."""
         return self._unknown_field_60
-    
+
+    @property
+    def map_name(self) -> str | None:
+        """Return the map identifier the mission was performed on (e.g. 'map1')."""
+        return self._map_name
+
     @property
     def has_data_file(self) -> bool:
         """Return True if mission data file path is available."""
