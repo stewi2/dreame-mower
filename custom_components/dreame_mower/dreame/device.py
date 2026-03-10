@@ -72,6 +72,7 @@ from .const import (
     ACTION_STOP,
     ACTION_DOCK,
     DEVICE_CODE_PROPERTY,
+    PROPERTY_1_1,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -940,7 +941,7 @@ class DreameMowerDevice:
         return True
 
 
-class DreamePoolRobotDevice(DreameMowerDevice):
+class DreameSwbotDevice(DreameMowerDevice):
     """Device handler for Dreame pool robots (dreame.swbot.* series).
 
     The Z1 only exposes three MiOT properties via REST/MQTT:
@@ -953,7 +954,7 @@ class DreamePoolRobotDevice(DreameMowerDevice):
     """
 
     def _handle_mqtt_property_update(self, message: dict[str, Any]) -> bool:
-        """Handle MQTT property updates — only battery and status are supported."""
+        """Handle MQTT property updates — only battery, status, and 1:1 are supported."""
         try:
             siid = message["siid"]
             piid = message["piid"]
@@ -974,7 +975,11 @@ class DreamePoolRobotDevice(DreameMowerDevice):
                     self._notify_property_change(STATUS_PROPERTY.name, status_code)
                 return True
 
+            if PROPERTY_1_1.matches(siid, piid):
+                # Capability array pushed every ~60 s — route through shared handler for logging
+                return self._misc_handler.handle_property_update(siid, piid, message["value"], self._notify_property_change)
+
         except Exception as ex:
-            _LOGGER.warning("DreamePoolRobotDevice: error handling property update: %s", ex)
+            _LOGGER.warning("DreameSwbotDevice: error handling property update: %s", ex)
 
         return False

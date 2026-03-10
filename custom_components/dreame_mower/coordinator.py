@@ -26,7 +26,7 @@ from .config_flow import (
     NOTIFICATION_ERROR,
     NOTIFICATION_MQTT_DISCOVERY,
 )
-from .dreame.device import DreameMowerDevice, DreamePoolRobotDevice
+from .dreame.device import DreameMowerDevice, DreameSwbotDevice
 from .dreame.issue_reporter import DreameMowerIssueReporter
 from .dreame.property import (
     DEVICE_CODE_ERROR_PROPERTY_NAME,
@@ -53,7 +53,7 @@ class DreameMowerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.entry = entry
 
         device_cls = (
-            DreamePoolRobotDevice
+            DreameSwbotDevice
             if entry.data.get(CONF_DEVICE_TYPE) == DEVICE_TYPE_SWBOT
             else DreameMowerDevice
         )

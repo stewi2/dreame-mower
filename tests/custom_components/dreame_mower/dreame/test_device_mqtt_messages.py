@@ -17,7 +17,7 @@ to ensure they are properly handled and don't create unhandled_mqtt notification
 import pytest
 from unittest.mock import Mock, patch
 
-from custom_components.dreame_mower.dreame.device import DreameMowerDevice
+from custom_components.dreame_mower.dreame.device import DreameMowerDevice, DreameSwbotDevice
 
 
 class TestDeviceMqttPropertyUpdate:
@@ -169,3 +169,103 @@ class TestDeviceMqttSilentlyAcknowledged:
         unhandled = [name for name, _ in notifications if name == "unhandled_mqtt"]
         assert unhandled == [], \
             f"[{description}] Unexpected unhandled_mqtt notification(s): {unhandled}"
+
+
+class TestDreameSwbotDeviceMqtt:
+    """Tests for DreameSwbotDevice MQTT message handling (dreame.swbot.* series)."""
+
+    @pytest.fixture
+    def pool_device(self):
+        """Create a DreameSwbotDevice instance for testing."""
+        with patch('custom_components.dreame_mower.dreame.device.DreameMowerCloudDevice'):
+            device = DreameSwbotDevice(
+                device_id="test_swbot",
+                username="test_user",
+                password="test_pass",
+                account_type="mi",
+                country="de",
+                hass_config_dir="/tmp"
+            )
+            return device
+
+    @pytest.mark.parametrize(
+        "mqtt_message,description",
+        [
+            (  # dreame.swbot.g2509 fw 4.3.6_0603 — capability array pushed every ~60s
+                {
+                    "id": 494846,
+                    "method": "properties_changed",
+                    "params": [{"piid": 1, "siid": 1, "value": [1, 0, 0, 0, 0, 0, 0, 0, 0, 229, 188, 0, 0, 0, 0, 0, 0, 8, 91, 2]}]
+                },
+                "1:1 capability array (dreame.swbot.g2509)"
+            ),
+            (  # Battery update
+                {
+                    "id": 100,
+                    "method": "properties_changed",
+                    "params": [{"piid": 1, "siid": 3, "value": 85}]
+                },
+                "battery 85%"
+            ),
+            (  # Status update
+                {
+                    "id": 101,
+                    "method": "properties_changed",
+                    "params": [{"piid": 1, "siid": 2, "value": 13}]
+                },
+                "status 13"
+            ),
+        ],
+    )
+    def test_pool_robot_silently_handled(self, pool_device, mqtt_message, description):
+        """Verify DreameSwbotDevice handles known messages without unhandled_mqtt."""
+        notifications = []
+        pool_device.register_property_callback(lambda name, value: notifications.append((name, value)))
+
+        pool_device._handle_message(mqtt_message)
+
+        unhandled = [name for name, _ in notifications if name == "unhandled_mqtt"]
+        assert unhandled == [], \
+            f"[{description}] Unexpected unhandled_mqtt notification(s): {unhandled}"
+
+    def test_pool_robot_battery_value(self, pool_device):
+        """Verify battery value is correctly extracted from 3:1 property."""
+        notifications = []
+        pool_device.register_property_callback(lambda name, value: notifications.append((name, value)))
+
+        pool_device._handle_message({
+            "id": 100,
+            "method": "properties_changed",
+            "params": [{"piid": 1, "siid": 3, "value": 72}]
+        })
+
+        assert pool_device.battery_percent == 72
+        assert ("battery_percent", 72) in notifications
+
+    def test_pool_robot_status_value(self, pool_device):
+        """Verify status value is correctly extracted from 2:1 property."""
+        notifications = []
+        pool_device.register_property_callback(lambda name, value: notifications.append((name, value)))
+
+        pool_device._handle_message({
+            "id": 101,
+            "method": "properties_changed",
+            "params": [{"piid": 1, "siid": 2, "value": 6}]
+        })
+
+        assert pool_device.status_code == 6
+        assert ("status", 6) in notifications
+
+    def test_pool_robot_1_1_no_notification(self, pool_device):
+        """Verify 1:1 capability array is silently acked — no HA property notification emitted."""
+        notifications = []
+        pool_device.register_property_callback(lambda name, value: notifications.append((name, value)))
+
+        pool_device._handle_message({
+            "id": 494846,
+            "method": "properties_changed",
+            "params": [{"piid": 1, "siid": 1, "value": [1, 0, 0, 0, 0, 0, 0, 0, 0, 229, 188, 0, 0, 0, 0, 0, 0, 8, 91, 2]}]
+        })
+
+        # No notifications expected — handled silently
+        assert notifications == []
