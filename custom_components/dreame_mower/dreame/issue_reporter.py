@@ -113,11 +113,11 @@ class DreameMowerIssueReporter:
             # Create notification content based on message type
             if message_type == "property":
                 title, message = self._create_property_notification(
-                    mqtt_data, message_preview, github_url
+                    mqtt_data, message_preview, github_url, device_model
                 )
             else:
                 title, message = self._create_message_notification(
-                    message_preview, github_url
+                    message_preview, github_url, device_model
                 )
             
             # Create the persistent notification in Home Assistant
@@ -149,7 +149,7 @@ class DreameMowerIssueReporter:
             # Create unique notification ID
             notification_id = f"dreame_mower_device_error_{code}"
             
-            title = f"🚨 Dreame Mower Error: {name}"
+            title = f"🚨 {device_model} Error: {name}"
             message = (
                 f"**Error Code:** {code}\n\n"
                 f"**Description:** {description}\n\n"
@@ -189,7 +189,7 @@ class DreameMowerIssueReporter:
             # Create unique notification ID
             notification_id = f"dreame_mower_device_info_{code}"
             
-            title = f"ℹ️ Dreame Mower Status: {name}"
+            title = f"ℹ️ {device_model} Status: {name}"
             message = (
                 f"**Status Code:** {code}\n\n"
                 f"**Description:** {description}\n\n"
@@ -288,14 +288,15 @@ class DreameMowerIssueReporter:
         self, 
         mqtt_data: dict[str, Any], 
         message_preview: str, 
-        github_url: str
+        github_url: str,
+        device_model: str = "Dreame Mower"
     ) -> tuple[str, str]:
         """Create notification content for unhandled property messages."""
         siid = mqtt_data.get("siid", "?")
         piid = mqtt_data.get("piid", "?")
         value = mqtt_data.get("value", "?")
         
-        title = f"🔍 New Dreame Mower Property: siid:{siid} piid:{piid}"
+        title = f"🔍 New {device_model} Property: siid:{siid} piid:{piid}"
         message = (
             f"**Property:** siid:{siid} piid:{piid} = {value}\n\n"
             f"**Preview:** {message_preview}\n\n"
@@ -308,10 +309,11 @@ class DreameMowerIssueReporter:
     def _create_message_notification(
         self, 
         message_preview: str, 
-        github_url: str
+        github_url: str,
+        device_model: str = "Dreame Mower"
     ) -> tuple[str, str]:
         """Create notification content for unhandled message types."""
-        title = "📨 Unhandled Dreame Mower Message"
+        title = f"📨 Unhandled {device_model} Message"
         message = (
             f"**Message Preview:** {message_preview}\n\n"
             f"[📝 Report this discovery on GitHub]({github_url})\n\n"
