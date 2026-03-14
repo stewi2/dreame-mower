@@ -37,6 +37,7 @@ PROPERTY_108_VALUE_FIELD = "value_108"
 # Task status code mapping for property 5:104
 TASK_STATUS_MAPPING: dict[int, str] = {
     7: "Task incomplete - spot mowing",
+    10: "Unknown task status: 10",  # observed after LOW_BATTERY event (issue #9)
     13: "Unknown task status: 13",
 }
 
