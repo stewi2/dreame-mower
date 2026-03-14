@@ -9,17 +9,28 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 from custom_components.dreame_mower.dreame.cloud.cloud_device import DreameMowerCloudDevice
 
+VALID_COUNTRIES = ["eu", "cn", "us", "ru", "sg"]
+
+
+def _prompt_country() -> str:
+    options = ", ".join(VALID_COUNTRIES)
+    while True:
+        val = input(f"Region [{options}] (default: eu): ").strip() or "eu"
+        if val in VALID_COUNTRIES:
+            return val
+        print(f"Invalid region. Choose one of: {options}")
+
 def main():
     parser = argparse.ArgumentParser(description="List Dreame devices for your account")
     parser.add_argument("--username", default=None, help="Cloud username (email); prompted if omitted")
-    parser.add_argument("--country", default=None, help="Cloud country code (e.g. 'cn', 'eu'); default: eu")
+    parser.add_argument("--country", default=None, choices=VALID_COUNTRIES, help=f"Cloud region ({', '.join(VALID_COUNTRIES)}); default: eu")
     args = parser.parse_args()
 
     if args.username is None:
         args.username = input("Username (email): ")
     args.password = getpass.getpass("Password: ")
     if args.country is None:
-        args.country = "eu"
+        args.country = _prompt_country()
 
     # Create DreameMowerCloudDevice with minimal info
     protocol = DreameMowerCloudDevice(

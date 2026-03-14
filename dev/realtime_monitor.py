@@ -180,6 +180,18 @@ for siid, piid in ADDITIONAL_PROPERTIES:
     elif (siid, piid) == (1, 5):
         KNOWN_PROPERTY_NAMES[(siid, piid)] = "serial_number"
 
+VALID_COUNTRIES = ["eu", "cn", "us", "ru", "sg"]
+
+
+def _prompt_country() -> str:
+    options = ", ".join(VALID_COUNTRIES)
+    while True:
+        val = input(f"Region [{options}] (default: eu): ").strip() or "eu"
+        if val in VALID_COUNTRIES:
+            return val
+        print(f"Invalid region. Choose one of: {options}")
+
+
 # --- Credential loading (copied logic style from probe_rest_properties) ---
 
 def _load_creds_from_launch() -> Dict[str, str]:
@@ -640,7 +652,7 @@ def parse_args():
     cred_group.add_argument("--launch-json", action="store_true", help="Load credentials from .vscode/launch.json")
     cred_group.add_argument("--username", default=None, metavar="EMAIL", help="Dreame account email (prompted if omitted)")
     p.add_argument("--device-id", default=None, help="Dreame device ID (prompted if omitted; find with list_devices.py)")
-    p.add_argument("--country", default=None, help="Country/region code (default: eu)")
+    p.add_argument("--country", default=None, choices=VALID_COUNTRIES, help=f"Region ({', '.join(VALID_COUNTRIES)}); default: eu")
     p.add_argument("--interval-seconds", type=int, default=120, help="REST polling interval (default 120)")
     p.add_argument("--duration-minutes", type=float, default=None, help="Optional total runtime; omit for infinite")
     p.add_argument("--log-root", default=None, help="Optional override for log root directory (default dev/logs/<TS>)")
@@ -658,7 +670,7 @@ def _resolve_creds(args: argparse.Namespace) -> Dict[str, str]:
     username = args.username or input("Username (email): ")
     password = getpass.getpass("Password: ")
     device_id = args.device_id or input("Device ID (find with list_devices.py): ")
-    country = args.country or "eu"
+    country = args.country or _prompt_country()
     return {"username": username, "password": password, "device_id": device_id, "country": country}
 
 
