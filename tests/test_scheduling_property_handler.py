@@ -13,9 +13,6 @@ from custom_components.dreame_mower.dreame.property.scheduling import (
     SummaryHandler,
     TaskType,
 )
-from custom_components.dreame_mower.dreame.property.property_misc import (
-    SettingsChangeHandler,
-)
 
 
 class TestTaskHandler:
@@ -118,49 +115,6 @@ class TestTaskHandler:
             'elapsed_time': 1500,
         }
         assert notification == expected
-
-
-class TestSettingsChangeHandler:
-    """Test SettingsChangeHandler for property 2:51."""
-
-    def setup_method(self):
-        """Set up test fixtures."""
-        self.handler = SettingsChangeHandler()
-
-    def test_parse_dict_format(self):
-        """Test parsing settings change from dict format."""
-        settings_data = {'start': 855, 'end': 858, 'value': 1}
-        
-        result = self.handler.parse_value(settings_data)
-        
-        assert result is True
-        assert self.handler.last_value == settings_data
-
-    def test_parse_timezone_format(self):
-        """Test parsing settings change with timezone data."""
-        settings_data = {'time': '1234567890', 'tz': 'Europe/Berlin'}
-        
-        result = self.handler.parse_value(settings_data)
-        
-        assert result is True
-        assert self.handler.last_value == {'time': '1234567890', 'tz': 'Europe/Berlin'}
-
-    def test_parse_array_format(self):
-        """Test parsing settings change with array value."""
-        settings_data = {'value': [80, 90, 0, 1, 660, 960]}
-        
-        result = self.handler.parse_value(settings_data)
-        
-        assert result is True
-        assert self.handler.last_value == settings_data
-
-    def test_parse_invalid_format(self):
-        """Test parsing invalid settings change format."""
-        result = self.handler.parse_value(123)  # Invalid type
-        assert result is False
-        
-        result = self.handler.parse_value("invalid string")  # Invalid type
-        assert result is False
 
 
 class TestSummaryHandler:
@@ -266,7 +220,7 @@ class TestSchedulingPropertyHandler:
         result = self.handler.handle_property_update(2, 50, "invalid json", self.notify_callback)
         assert result is False
         
-        # Invalid settings change data (invalid type)
+        # Non-scheduling property is not handled
         result = self.handler.handle_property_update(2, 51, 12345, self.notify_callback)
         assert result is False
         

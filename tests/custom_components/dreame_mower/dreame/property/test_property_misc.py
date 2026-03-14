@@ -1,9 +1,13 @@
 """Tests for miscellaneous property handlers (property_misc module)."""
 
 import pytest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
-from custom_components.dreame_mower.dreame.property.property_misc import Property11Handler
+from custom_components.dreame_mower.dreame.property.property_misc import (
+    Property11Handler,
+    SettingsChangeHandler,
+    MiscPropertyHandler,
+)
 
 
 class TestProperty11Handler:
@@ -112,3 +116,68 @@ class TestProperty11Handler:
         result = handler.parse_value(test_data_2)
         assert result is True
         assert handler.last_value == test_data_2
+
+
+class TestSettingsChangeHandler:
+    """Test SettingsChangeHandler for property 2:51."""
+
+    def test_parse_dict_format(self):
+        """Test parsing settings change from dict format."""
+        handler = SettingsChangeHandler()
+        settings_data = {'start': 855, 'end': 858, 'value': 1}
+        assert handler.parse_value(settings_data) is True
+        assert handler.last_value == settings_data
+
+    def test_parse_timezone_format(self):
+        """Test parsing settings change with timezone data."""
+        handler = SettingsChangeHandler()
+        settings_data = {'time': '1234567890', 'tz': 'Europe/Berlin'}
+        assert handler.parse_value(settings_data) is True
+        assert handler.last_value == {'time': '1234567890', 'tz': 'Europe/Berlin'}
+
+    def test_parse_invalid_format(self):
+        """Test parsing invalid settings change format."""
+        handler = SettingsChangeHandler()
+        assert handler.parse_value(123) is False
+        assert handler.parse_value("invalid string") is False
+
+
+class TestMiscPropertyHandler:
+    """Test MiscPropertyHandler routing."""
+
+    def test_matches_property_1_1(self):
+        """Test that 1:1 is recognised as a misc property."""
+        assert MiscPropertyHandler.matches(1, 1) is True
+
+    def test_matches_settings_change(self):
+        """Test that 2:51 is recognised as a misc property."""
+        assert MiscPropertyHandler.matches(2, 51) is True
+
+    def test_does_not_match_other_properties(self):
+        """Test that unrelated properties are not matched."""
+        assert MiscPropertyHandler.matches(3, 1) is False
+        assert MiscPropertyHandler.matches(2, 50) is False
+
+    def test_handle_property_1_1(self):
+        """Test that 1:1 update is handled successfully."""
+        handler = MiscPropertyHandler()
+        notify = MagicMock()
+        result = handler.handle_property_update(1, 1, [206] + [0] * 18 + [206], notify)
+        assert result is True
+        notify.assert_not_called()  # Property 1:1 doesn't emit a notification
+
+    def test_handle_settings_change(self):
+        """Test that 2:51 update is handled successfully."""
+        handler = MiscPropertyHandler()
+        notify = MagicMock()
+        result = handler.handle_property_update(2, 51, {'value': 1}, notify)
+        assert result is True
+        notify.assert_not_called()  # Settings change doesn't emit a notification
+
+    def test_handle_unknown_property_returns_false(self):
+        """Test that an unknown property returns False."""
+        handler = MiscPropertyHandler()
+        notify = MagicMock()
+        result = handler.handle_property_update(5, 99, 42, notify)
+        assert result is False
+
