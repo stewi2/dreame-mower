@@ -10,7 +10,7 @@ You'll run a monitoring script that logs communication between the Dreame cloud 
 
 ### Setup (one time)
 
-You need Python 3.11+ and Git.
+You need Python 3.14 and Git. Python 3.14 is required — earlier versions are incompatible with Home Assistant 2026.3.1 and will fail when running `pip install -r tests/requirements.txt`.
 
 ```bash
 git clone https://github.com/antondaubert/dreame-mower.git
@@ -25,7 +25,7 @@ python3 -m venv .venv
 .venv/bin/python dev/list_devices.py
 ```
 
-Enter your Dreame account email and password when prompted. You will also be asked for your region — choose the one matching your account (`eu`, `cn`, `us`, `ru`, or `sg`). Note the numeric `did` value for your mower from the output.
+Enter your Dreame (or Mova) account email and password when prompted. You will also be asked for your region — choose the one matching your account (`eu`, `cn`, `us`, `ru`, or `sg`) — and your account type (`dreame` or `mova`). Note the numeric `did` value for your mower from the output.
 
 ### Step 2 – run the monitor
 
@@ -33,7 +33,7 @@ Enter your Dreame account email and password when prompted. You will also be ask
 .venv/bin/python dev/realtime_monitor.py
 ```
 
-Enter your email, password, region, and the device ID from Step 1 when prompted.
+Enter your email, password, region, and account type when prompted.
 
 Now use the **Dreame app** to perform the action described in the issue (e.g. switch maps, start a zone mow). Do this a few times if you can. Let the monitor run for a couple of days or at least long enough to capture a few repetitions. Note: please ensure your computer doesn't go into sleep mode during this period.
 
