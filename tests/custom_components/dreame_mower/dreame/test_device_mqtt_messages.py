@@ -174,6 +174,14 @@ class TestDeviceMqttSilentlyAcknowledged:
                 },
                 "issue #38: 2:67 value [0, 0, 0, 0] after MOWING_COMPLETED (mova.mower.g2420a fw 4.3.6_0325)"
             ),
+            (  # Issue #36: 2:67 non-zero 4-integer array variant after MOWING_COMPLETED
+                {
+                    "id": 1087,
+                    "method": "properties_changed",
+                    "params": [{"did": "-1******94", "piid": 67, "siid": 2, "value": [19, 5, 0, 0]}]
+                },
+                "issue #36: 2:67 value [19, 5, 0, 0] after MOWING_COMPLETED (mova.mower.g2529c fw 4.3.6_0169)"
+            ),
         ],
     )
     def test_silently_acknowledged_mqtt_messages(self, device, mqtt_message, description):

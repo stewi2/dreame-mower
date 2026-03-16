@@ -720,7 +720,7 @@ class DreameMowerDevice:
                     return False  # Report false for unrecognized values
             elif SERVICE2_PROPERTY_67.matches(siid, piid):
                 # Handle Service 2 property 67 (2:67) - 4-integer array, observed after MOWING_COMPLETED
-                # Meaning unknown; silently acknowledge to suppress unhandled MQTT notifications (issues #34, #35, #38)
+                # Meaning unknown; silently acknowledge to suppress unhandled MQTT notifications (issues #34, #35, #36, #38)
                 _LOGGER.debug("Service 2 property 67 received: %s", message.get("value"))
             elif DEVICE_FILE_PATH_PROPERTY.matches(siid, piid) or DEVICE_FILE_PATH_PROPERTY_20.matches(siid, piid):
                 # Handle file path properties (99:10, 99:20) - provide cloud file paths for:
