@@ -8,6 +8,7 @@ from custom_components.dreame_mower.dreame.property.device_code import (
     DeviceCodeRegistry,
     DeviceCodeType,
     BASE_DEVICE_CODES,
+    MOVA_DEVICE_CODES,
     get_device_code_registry,
     NOTIFICATION_CODE_FIELD,
     NOTIFICATION_NAME_FIELD,
@@ -241,3 +242,52 @@ class TestNewBladeWearCode:
         for model in [None, "dreame.mower.p2255", "mova.mower.g2405b"]:
             registry = get_device_code_registry(model)
             assert registry.get_name(28) == "BLADES_SEVERELY_WORN"
+
+
+class TestMovaDriveWheelCodes:
+    """Tests for MOVA drive wheel error codes 4 and 5."""
+
+    @pytest.mark.parametrize("code,expected_name,expected_description", [
+        (4, "LEFT_DRIVE_WHEEL_ERROR", "Left drive wheel error"),
+        (5, "RIGHT_DRIVE_WHEEL_ERROR", "Right drive wheel error"),
+    ])
+    def test_codes_in_mova_registry(self, code, expected_name, expected_description):
+        """Codes 4 and 5 should be present in MOVA_DEVICE_CODES."""
+        assert code in MOVA_DEVICE_CODES
+        defn = MOVA_DEVICE_CODES[code]
+        assert defn.name == expected_name
+        assert defn.description == expected_description
+        assert defn.code_type == DeviceCodeType.ERROR
+        assert defn.is_error() is True
+
+    @pytest.mark.parametrize("model,code,expected_name", [
+        ("mova.mower.g2405b", 4, "LEFT_DRIVE_WHEEL_ERROR"),
+        ("mova.mower.g2405c", 4, "LEFT_DRIVE_WHEEL_ERROR"),
+        ("mova.mower.g2529b", 4, "LEFT_DRIVE_WHEEL_ERROR"),
+        ("mova.mower.g2405b", 5, "RIGHT_DRIVE_WHEEL_ERROR"),
+        ("mova.mower.g2529b", 5, "RIGHT_DRIVE_WHEEL_ERROR"),
+    ])
+    def test_codes_available_for_mova_models(self, model, code, expected_name):
+        """Codes 4 and 5 should resolve correctly for all MOVA models."""
+        registry = get_device_code_registry(model)
+        assert registry.get_name(code) == expected_name
+        assert registry.is_error(code) is True
+
+    @pytest.mark.parametrize("code", [4, 5])
+    def test_codes_not_in_base_registry(self, code):
+        """Codes 4 and 5 should not be in the base or A1 registry."""
+        assert get_device_code_registry(None).get_code(code) is None
+        assert get_device_code_registry("dreame.mower.p2255").get_code(code) is None
+
+    @pytest.mark.parametrize("code,expected_name", [
+        (4, "LEFT_DRIVE_WHEEL_ERROR"),
+        (5, "RIGHT_DRIVE_WHEEL_ERROR"),
+    ])
+    def test_parse_value_with_mova_model(self, code, expected_name):
+        """Handler with MOVA model should parse codes 4 and 5 correctly."""
+        handler = DeviceCodeHandler(model="mova.mower.g2529b")
+        assert handler.parse_value(code) is True
+        assert handler.device_code == code
+        assert handler.device_code_name == expected_name
+        assert handler.device_code_is_error is True
+        assert handler.device_code_is_warning is False

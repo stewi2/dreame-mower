@@ -403,6 +403,18 @@ MOVA_DEVICE_CODES: Dict[int, DeviceCodeDefinition] = {
         description="Robot tilted",
         code_type=DeviceCodeType.ERROR
     ),
+    4: DeviceCodeDefinition(
+        code=4,
+        name="LEFT_DRIVE_WHEEL_ERROR",
+        description="Left drive wheel error",
+        code_type=DeviceCodeType.ERROR
+    ),
+    5: DeviceCodeDefinition(
+        code=5,
+        name="RIGHT_DRIVE_WHEEL_ERROR",
+        description="Right drive wheel error",
+        code_type=DeviceCodeType.ERROR
+    ),
     12: DeviceCodeDefinition(
         code=12,
         name="LIDAR_IS_BLOCKED",
@@ -438,7 +450,7 @@ def get_device_code_registry(model: str | None = None) -> DeviceCodeRegistry:
 
     if model in ["dreame.mower.p2255", "dreame.mower.g2422"]:  # A1 and A1 Pro models
         return A1_DEVICE_CODE_REGISTRY
-    elif model in ["mova.mower.g2405b", "mova.mower.g2405c"]:  # MOVA models
+    elif model in ["mova.mower.g2405b", "mova.mower.g2405c", "mova.mower.g2529b"]:  # MOVA models
         return MOVA_DEVICE_CODE_REGISTRY
     
     return BASE_DEVICE_CODE_REGISTRY
