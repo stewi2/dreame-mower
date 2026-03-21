@@ -67,14 +67,24 @@ class MowerControlStatusHandler:
                 self._action = None
                 return True
             
-            # Get first status entry (assuming format [[x, y]])
-            if not isinstance(status_array[0], list) or len(status_array[0]) < 2:
-                raise ValueError(f"Invalid status entry format: {status_array[0]}")
+            # Find the first active entry (skip -1 = zone inactive)
+            # Format: [[zone_id, status_code], ...] - multi-zone arrays report -1 for inactive zones
+            active_entry = None
+            for entry in status_array:
+                if not isinstance(entry, list) or len(entry) < 2:
+                    raise ValueError(f"Invalid status entry format: {entry}")
+                if int(entry[1]) != -1:
+                    active_entry = entry
+                    break
             
-            status_entry = status_array[0]
+            if active_entry is None:
+                # All zones inactive
+                self._status_code = None
+                self._action = None
+                return True
             
             # Extract status code from second position
-            self._status_code = int(status_entry[1])
+            self._status_code = int(active_entry[1])
             
             # Determine action based on status code
             if self._status_code == 0:

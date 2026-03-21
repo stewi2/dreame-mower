@@ -113,6 +113,15 @@ class TestDeviceMqttPropertyUpdate:
                 "service5_property_100",
                 lambda v: v["value_100"] == 5
             ),
+            (  # Issue #42: 2:56 multi-zone status array with inactive (-1) entries (mova.mower.g2529b fw 4.3.6_0169)
+                {
+                    "id": 325,
+                    "method": "properties_changed",
+                    "params": [{"did": "-1******39", "piid": 56, "siid": 2, "value": {"status": [[1,-1],[2,0],[3,-1],[4,-1]]}}]
+                },
+                "mower_control_status",
+                lambda v: v["action"] == "continue" and v["status"] == 0
+            ),
         ],
     )
     def test_full_mqtt_messages_parametrized(
