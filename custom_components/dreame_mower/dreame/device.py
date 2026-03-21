@@ -713,9 +713,10 @@ class DreameMowerDevice:
             elif SERVICE2_PROPERTY_65.matches(siid, piid):
                 # Handle Service 2 property 65 (2:65) - task navigation/SLAM status
                 # Known values: dm::TASK_NAV_DOCK (returning to dock), dm::TASK_SLAM_RELOCATE (mower relocating after getting stuck, issue #37)
+                #               dm::TASK_NAV_DIVIDE_REGION (region division navigation)
                 # TODO: Consider doing something useful with this property change later
                 property_value_str = str(message["value"])
-                if property_value_str in ("dm::TASK_NAV_DOCK", "dm::TASK_SLAM_RELOCATE"):
+                if property_value_str in ("dm::TASK_NAV_DOCK", "dm::TASK_SLAM_RELOCATE", "dm::TASK_NAV_DIVIDE_REGION"):
                     self._notify_property_change(SERVICE2_PROPERTY_65.name, property_value_str)
                     _LOGGER.debug("2:65 value: %s", property_value_str)
                 else:

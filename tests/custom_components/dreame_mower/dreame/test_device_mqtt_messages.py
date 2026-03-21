@@ -77,6 +77,15 @@ class TestDeviceMqttPropertyUpdate:
                 "service2_property_65",
                 lambda v: v == "dm::TASK_SLAM_RELOCATE"
             ),
+            (  # 2:65 dm::TASK_NAV_DIVIDE_REGION (dreame.mower.g2408 fw 4.3.6_0447)
+                {
+                    "id": 341,
+                    "method": "properties_changed",
+                    "params": [{"did": "-1******95", "piid": 65, "siid": 2, "value": "dm::TASK_NAV_DIVIDE_REGION"}]
+                },
+                "service2_property_65",
+                lambda v: v == "dm::TASK_NAV_DIVIDE_REGION"
+            ),
             (  # Issue #51: 1:4 11-byte medium format (mova.mower.g2529d fw 4.3.6_0169)
                 {
                     "id": 244,
