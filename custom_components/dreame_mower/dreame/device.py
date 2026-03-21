@@ -47,6 +47,7 @@ from .const import (
     SERVICE2_PROPERTY_63,
     SERVICE2_PROPERTY_64,
     SERVICE2_PROPERTY_65,
+    SERVICE2_PROPERTY_66,
     SERVICE2_PROPERTY_67,
     FIRMWARE_INSTALL_STATE_PROPERTY,
     FIRMWARE_DOWNLOAD_PROGRESS_PROPERTY,
@@ -718,6 +719,10 @@ class DreameMowerDevice:
                 else:
                     _LOGGER.debug("Unrecognized 2:65 value: %s", property_value_str)
                     return False  # Report false for unrecognized values
+            elif SERVICE2_PROPERTY_66.matches(siid, piid):
+                # Handle Service 2 property 66 (2:66) - 2-integer array, reported on mova.mower.g2529d fw 4.3.6_0169
+                # Meaning unknown; silently acknowledge to suppress unhandled MQTT notifications (issue #48)
+                _LOGGER.debug("Service 2 property 66 received: %s", message.get("value"))
             elif SERVICE2_PROPERTY_67.matches(siid, piid):
                 # Handle Service 2 property 67 (2:67) - 4-integer array, observed after MOWING_COMPLETED
                 # Meaning unknown; silently acknowledge to suppress unhandled MQTT notifications (issues #34, #35, #36, #38)

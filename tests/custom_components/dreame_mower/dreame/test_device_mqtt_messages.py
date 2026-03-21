@@ -182,6 +182,14 @@ class TestDeviceMqttSilentlyAcknowledged:
                 },
                 "issue #36: 2:67 value [19, 5, 0, 0] after MOWING_COMPLETED (mova.mower.g2529c fw 4.3.6_0169)"
             ),
+            (  # Issue #48: 2:66 2-integer array on mova.mower.g2529d
+                {
+                    "id": 398,
+                    "method": "properties_changed",
+                    "params": [{"did": "-1******76", "piid": 66, "siid": 2, "value": [97, 220]}]
+                },
+                "issue #48: 2:66 value [97, 220] (mova.mower.g2529d fw 4.3.6_0169)"
+            ),
         ],
     )
     def test_silently_acknowledged_mqtt_messages(self, device, mqtt_message, description):

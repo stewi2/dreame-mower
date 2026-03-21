@@ -66,6 +66,7 @@ SERVICE2_PROPERTY_62 = PropertyIdentifier(siid=2, piid=62, name="service2_proper
 SERVICE2_PROPERTY_63 = PropertyIdentifier(siid=2, piid=63, name="service2_property_63")
 SERVICE2_PROPERTY_64 = PropertyIdentifier(siid=2, piid=64, name="service2_property_64")
 SERVICE2_PROPERTY_65 = PropertyIdentifier(siid=2, piid=65, name="service2_property_65")
+SERVICE2_PROPERTY_66 = PropertyIdentifier(siid=2, piid=66, name="service2_property_66")
 SERVICE2_PROPERTY_67 = PropertyIdentifier(siid=2, piid=67, name="service2_property_67")
 
 BATTERY_PROPERTY = PropertyIdentifier(siid=3, piid=1, name="battery_percent")
