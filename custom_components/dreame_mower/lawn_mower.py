@@ -88,15 +88,7 @@ class DreameMowerLawnMower(DreameMowerEntity, LawnMowerEntity):
             new_activity = map_status_to_activity(value)
             if new_activity != self._attr_activity:
                 self._attr_activity = new_activity
-                # Schedule state update on the event loop to ensure thread safety
-                self.hass.create_task(self._async_update_ha_state())
-    
-    async def _async_update_ha_state(self) -> None:
-        """Update HA state asynchronously on the event loop."""
-        try:
-            self.async_write_ha_state()
-        except Exception as ex:
-            _LOGGER.exception("Error updating HA state: %s", ex)
+                self.schedule_update_ha_state()
 
     async def async_start_mowing(self) -> None:
         """Start mowing."""

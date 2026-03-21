@@ -53,34 +53,34 @@ def test_activity_returns_current_when_available():
 
 def test_on_property_change_ignores_non_status_property():
     entity = _make_entity()
-    entity.hass.create_task = MagicMock()
+    entity.schedule_update_ha_state = MagicMock()
     entity._attr_activity = LawnMowerActivity.DOCKED
 
     entity._on_property_change("some_other_property", 1)
 
     assert entity._attr_activity == LawnMowerActivity.DOCKED
-    entity.hass.create_task.assert_not_called()
+    entity.schedule_update_ha_state.assert_not_called()
 
 
 def test_on_property_change_updates_activity_to_mowing():
     entity = _make_entity()
-    entity.hass.create_task = MagicMock()
+    entity.schedule_update_ha_state = MagicMock()
 
     entity._on_property_change(STATUS_PROPERTY.name, DeviceStatus.MOWING)
 
     assert entity._attr_activity == LawnMowerActivity.MOWING
-    entity.hass.create_task.assert_called_once()
+    entity.schedule_update_ha_state.assert_called_once_with()
 
 
 def test_on_property_change_does_not_schedule_update_when_activity_unchanged():
     entity = _make_entity()
     entity._attr_activity = LawnMowerActivity.DOCKED
-    entity.hass.create_task = MagicMock()
+    entity.schedule_update_ha_state = MagicMock()
 
     # CHARGING also maps to DOCKED, so activity won't change
     entity._on_property_change(STATUS_PROPERTY.name, DeviceStatus.CHARGING)
 
-    entity.hass.create_task.assert_not_called()
+    entity.schedule_update_ha_state.assert_not_called()
 
 
 @pytest.mark.asyncio
