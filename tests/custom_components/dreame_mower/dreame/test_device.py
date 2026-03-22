@@ -1,6 +1,7 @@
 """Basic tests for the DreameMowerDevice class."""
 
 import asyncio
+import logging
 import pytest
 from datetime import datetime
 from types import SimpleNamespace
@@ -203,7 +204,7 @@ async def test_disconnect(device):
 
 @pytest.mark.asyncio
 async def test_start_mowing_when_connected(device):
-    """Test start mowing when device is connected."""
+    """Test public start mowing when device is connected."""
     device._cloud_device.set_connected_state(True)
     await device.connect()
     
@@ -213,9 +214,93 @@ async def test_start_mowing_when_connected(device):
 
 @pytest.mark.asyncio
 async def test_start_mowing_when_disconnected(device):
-    """Test start mowing when device is disconnected."""
+    """Test public start mowing when device is disconnected."""
     result = await device.start_mowing()
     assert result is False
+
+
+@pytest.mark.asyncio
+async def test_start_mowing_delegates_to_selected_mode(device):
+    """Public start_mowing should dispatch through the mode-based API."""
+    device._cloud_device.set_connected_state(True)
+    await device.connect()
+
+    result = await device.start_mowing(MowingMode.ZONE, zone_ids=[1])
+
+    assert result is True
+    _, _, parameters, _ = device._cloud_device.action_calls[0]
+    assert parameters == [{"m": "a", "p": 0, "o": 102, "d": {"region": [1]}}]
+
+
+@pytest.mark.asyncio
+async def test_start_mowing_all_area_logs_warning_when_falling_back_to_generic(device, caplog):
+    """All-area without a map should warn before using the generic start action."""
+    device._cloud_device.set_connected_state(True)
+    await device.connect()
+
+    with caplog.at_level(logging.WARNING):
+        result = await device.start_mowing_all_area()
+
+    assert result is True
+    assert "fell back to the generic START_MOWING action" in caplog.text
+    assert device._cloud_device.action_calls[0][2] == [{"m": "g", "t": "MAPL"}]
+    siid, aiid, parameters, retry_count = device._cloud_device.action_calls[-1]
+    assert (siid, aiid) == (5, 1)
+    assert parameters is None
+
+
+@pytest.mark.asyncio
+async def test_start_mowing_all_area_uses_current_map_id_when_known(device, caplog):
+    """All-area starts should prefer the known current map before any generic fallback."""
+    device._cloud_device.set_connected_state(True)
+    await device.connect()
+    device._current_map_id = 2
+    device._vector_map = SimpleNamespace(
+        available_maps=[
+            SimpleNamespace(map_id=1, map_index=0, name="Front", total_area=25.0),
+            SimpleNamespace(map_id=2, map_index=1, name="Back", total_area=30.5),
+        ]
+    )
+
+    with caplog.at_level(logging.WARNING):
+        result = await device.start_mowing_all_area()
+
+    assert result is True
+    assert "fell back to the generic START_MOWING action" not in caplog.text
+    siid, aiid, parameters, retry_count = device._cloud_device.action_calls[0]
+    assert (siid, aiid) == (2, 50)
+    assert parameters == [{"m": "a", "p": 0, "o": 100, "d": {"region_id": [2], "area_id": []}}]
+
+
+@pytest.mark.asyncio
+async def test_start_mowing_all_area_refreshes_current_map_before_generic_fallback(device, caplog):
+    """All-area starts should try MAPL refresh before falling back to the generic action."""
+    device._cloud_device.set_connected_state(True)
+    await device.connect()
+    device._vector_map = SimpleNamespace(
+        current_map_id=None,
+        available_maps=[
+            SimpleNamespace(map_id=1, map_index=0, name="Front", total_area=25.0),
+            SimpleNamespace(map_id=2, map_index=1, name="Back", total_area=30.5),
+        ]
+    )
+    device._cloud_device.action_result = {
+        "siid": 2,
+        "aiid": 50,
+        "code": 0,
+        "out": [{"d": [[0, 0, 1, 1, 0], [1, 1, 1, 1, 0]], "m": "r", "q": 4778, "r": 0}],
+    }
+
+    with caplog.at_level(logging.WARNING):
+        result = await device.start_mowing_all_area()
+
+    assert result is True
+    assert "fell back to the generic START_MOWING action" not in caplog.text
+    assert len(device._cloud_device.action_calls) == 2
+    assert device._cloud_device.action_calls[0][2] == [{"m": "g", "t": "MAPL"}]
+    assert device._cloud_device.action_calls[1][2] == [
+        {"m": "a", "p": 0, "o": 100, "d": {"region_id": [2], "area_id": []}}
+    ]
 
 
 @pytest.mark.asyncio

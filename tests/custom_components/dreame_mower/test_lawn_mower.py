@@ -4,6 +4,7 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from homeassistant.components.lawn_mower import LawnMowerActivity
+from custom_components.dreame_mower.dreame.device import MowingMode
 from custom_components.dreame_mower.lawn_mower import DreameMowerLawnMower
 from custom_components.dreame_mower.dreame.const import STATUS_PROPERTY, DeviceStatus
 
@@ -28,6 +29,7 @@ def _make_coordinator(connected=True, status_code=0):
     coordinator.available_maps = []
     coordinator.current_map_id = None
     coordinator.task_target_map_id = None
+    coordinator.selected_mowing_mode = MowingMode.ALL_AREA
     return coordinator
 
 
@@ -91,7 +93,22 @@ def test_on_property_change_does_not_schedule_update_when_activity_unchanged():
 async def test_async_start_mowing_calls_device():
     entity = _make_entity()
     await entity.async_start_mowing()
-    entity.coordinator.device.start_mowing.assert_called_once()
+    entity.coordinator.device.start_mowing.assert_awaited_once_with(mode=MowingMode.ALL_AREA)
+
+
+@pytest.mark.asyncio
+async def test_async_start_mowing_uses_selected_edge_mode_with_contours():
+    coordinator = _make_coordinator()
+    coordinator.selected_mowing_mode = MowingMode.EDGE
+    coordinator.contours = [[1, 0], [2, 0]]
+    entity = _make_entity(coordinator)
+
+    await entity.async_start_mowing()
+
+    entity.coordinator.device.start_mowing.assert_awaited_once_with(
+        mode=MowingMode.EDGE,
+        contour_ids=[[1, 0], [2, 0]],
+    )
 
 
 @pytest.mark.asyncio
@@ -123,4 +140,5 @@ def test_extra_state_attributes_include_zones_and_contours():
         "maps": [{"id": 1, "index": 0, "name": "Front", "area": 12.5}],
         "current_map_id": 1,
         "task_target_map_id": 2,
+        "selected_mowing_mode": "all_area",
     }

@@ -16,6 +16,7 @@ from homeassistant.components.lawn_mower import (  # type: ignore[attr-defined]
 
 from .const import DATA_COORDINATOR, DOMAIN
 from .coordinator import DreameMowerCoordinator
+from .dreame.device import MowingMode
 from .entity import DreameMowerEntity
 from .dreame.const import STATUS_PROPERTY, map_status_to_activity
 
@@ -90,9 +91,14 @@ class DreameMowerLawnMower(DreameMowerEntity, LawnMowerEntity):
                 self.schedule_update_ha_state()
 
     async def async_start_mowing(self) -> None:
-        """Start mowing using the device's default start command."""
+        """Start mowing using the device's public mowing entrypoint."""
         try:
-            if not await self.coordinator.device.start_mowing():
+            mode = self.coordinator.selected_mowing_mode
+            start_kwargs: dict[str, Any] = {"mode": mode}
+            if mode == MowingMode.EDGE:
+                start_kwargs["contour_ids"] = self.coordinator.contours
+
+            if not await self.coordinator.device.start_mowing(**start_kwargs):
                 _LOGGER.error("Failed to start mowing")
         except Exception as ex:
             _LOGGER.error("Exception while starting mowing: %s", ex)
@@ -116,6 +122,7 @@ class DreameMowerLawnMower(DreameMowerEntity, LawnMowerEntity):
             attributes["current_map_id"] = current_map_id
         if task_target_map_id is not None:
             attributes["task_target_map_id"] = task_target_map_id
+        attributes["selected_mowing_mode"] = self.coordinator.selected_mowing_mode.value
         return attributes
 
     async def async_pause(self) -> None:

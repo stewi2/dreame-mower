@@ -20,6 +20,7 @@ _MOWER_PLATFORMS = (
     Platform.LAWN_MOWER,
     Platform.SENSOR,
     Platform.CAMERA,
+    Platform.SELECT,
 )
 _SWBOT_PLATFORMS = (
     Platform.SENSOR,

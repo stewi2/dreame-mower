@@ -10,7 +10,7 @@ TODO: Implement connection retry logic
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 from enum import Enum
 import logging
 import os
@@ -950,8 +950,8 @@ class DreameMowerDevice:
         except Exception as ex:
             _LOGGER.error("Error disconnecting from device %s: %s", self._device_id, ex)
 
-    async def start_mowing(self) -> bool:
-        """Start mowing operation."""
+    async def _start_mowing_generic(self) -> bool:
+        """Start mowing using the generic cloud action."""
         if not await asyncio.get_event_loop().run_in_executor(
             None, lambda: self._cloud_device.execute_action(ACTION_START_MOWING)
         ):
@@ -963,6 +963,26 @@ class DreameMowerDevice:
         
         self._notify_property_change("activity", "mowing")
         return True
+
+    async def start_mowing(
+        self,
+        mode: MowingMode = MowingMode.ALL_AREA,
+        *,
+        map_id: int | None = None,
+        zone_ids: list[int] | None = None,
+        contour_ids: list[list[int]] | None = None,
+        spot_area_ids: list[int] | None = None,
+        spot_rectangle: dict[str, int | float] | None = None,
+    ) -> bool:
+        """Start mowing using the public mode-oriented entrypoint."""
+        return await self.start_mowing_mode(
+            mode,
+            map_id=map_id,
+            zone_ids=zone_ids,
+            contour_ids=contour_ids,
+            spot_area_ids=spot_area_ids,
+            spot_rectangle=spot_rectangle,
+        )
 
     def supports_mowing_mode(self, mode: MowingMode) -> bool:
         """Return whether a mowing mode has a outbound command path."""
@@ -1213,7 +1233,7 @@ class DreameMowerDevice:
                 self._vector_map.boundary.y2 / 100.0,
             )
 
-        all_paths: list[Iterable[tuple[int, int]]] = [
+        all_paths: Sequence[Iterable[tuple[int, int]]] = [
             zone.path for zone in self._vector_map.zones
         ] + [
             zone.path for zone in self._vector_map.forbidden_areas
@@ -1350,7 +1370,21 @@ class DreameMowerDevice:
     async def start_mowing_all_area(self, map_id: int | None = None) -> bool:
         """Start all-area mowing, optionally targeting a specific map identifier."""
         if map_id is None:
-            return await self.start_mowing()
+            map_id = self.current_map_id
+
+        if map_id is None:
+            try:
+                await asyncio.get_event_loop().run_in_executor(None, self.refresh_current_map_id)
+            except Exception as ex:
+                _LOGGER.debug("Failed to refresh current map before all-area start fallback: %s", ex)
+
+            map_id = self.current_map_id
+
+        if map_id is None:
+            _LOGGER.warning(
+                "All-area mowing fell back to the generic START_MOWING action because no map_id was provided"
+            )
+            return await self._start_mowing_generic()
 
         if not self._validate_map_id(map_id):
             return False

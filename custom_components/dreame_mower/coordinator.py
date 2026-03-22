@@ -26,7 +26,7 @@ from .config_flow import (
     NOTIFICATION_ERROR,
     NOTIFICATION_MQTT_DISCOVERY,
 )
-from .dreame.device import DreameMowerDevice, DreameSwbotDevice
+from .dreame.device import DreameMowerDevice, DreameSwbotDevice, MowingMode
 from .dreame.issue_reporter import DreameMowerIssueReporter
 from .dreame.property import (
     DEVICE_CODE_ERROR_PROPERTY_NAME,
@@ -64,6 +64,7 @@ class DreameMowerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             entry.data[CONF_ACCOUNT_TYPE],
             entry.data[CONF_COUNTRY],
             hass.config.config_dir)
+        self._selected_mowing_mode = MowingMode.ALL_AREA
         
         # Initialize issue reporter for unhandled MQTT messages
         self.issue_reporter = DreameMowerIssueReporter(hass)
@@ -266,6 +267,31 @@ class DreameMowerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     def task_target_map_id(self) -> int | None:
         """Return the map targeted by the active task, if known."""
         return self.device.task_target_map_id
+
+    @property
+    def selected_mowing_mode(self) -> MowingMode:
+        """Return the user-selected default mowing mode for the main start action."""
+        return self._selected_mowing_mode
+
+    @property
+    def selectable_mowing_modes(self) -> list[MowingMode]:
+        """Return mowing modes that can be driven by the main start action."""
+        modes = [MowingMode.ALL_AREA]
+        if self.contours:
+            modes.append(MowingMode.EDGE)
+        return modes
+
+    async def async_set_selected_mowing_mode(self, mode: MowingMode) -> None:
+        """Update the user-selected default mowing mode."""
+        if mode not in self.selectable_mowing_modes:
+            raise ValueError(f"Unsupported selectable mowing mode: {mode}")
+
+        if self._selected_mowing_mode == mode:
+            return
+
+        self._selected_mowing_mode = mode
+        data = await self._async_update_data()
+        self.async_set_updated_data(data)
 
     def _handle_device_update(self, property_name: str, value: Any) -> None:
         """Handle device property updates and notify Home Assistant."""
