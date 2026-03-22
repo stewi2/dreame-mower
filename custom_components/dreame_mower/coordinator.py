@@ -65,6 +65,9 @@ class DreameMowerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             entry.data[CONF_COUNTRY],
             hass.config.config_dir)
         self._selected_mowing_mode = MowingMode.ALL_AREA
+        self._selected_contour_id: tuple[int, int] | None = None
+        self._selected_zone_id: int | None = None
+        self._selected_spot_area_id: int | None = None
         
         # Initialize issue reporter for unhandled MQTT messages
         self.issue_reporter = DreameMowerIssueReporter(hass)
@@ -254,6 +257,11 @@ class DreameMowerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return self.device.contours
 
     @property
+    def spot_areas(self) -> list[dict]:
+        """Return available spot-mowing areas from vector map."""
+        return self.device.spot_areas
+
+    @property
     def available_maps(self) -> list[dict[str, Any]]:
         """Return the maps currently known from vector map data."""
         return self.device.available_maps
@@ -279,10 +287,24 @@ class DreameMowerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         modes = [MowingMode.ALL_AREA]
         if self.contours:
             modes.append(MowingMode.EDGE)
+        if self.zones:
+            modes.append(MowingMode.ZONE)
+        if self.spot_areas:
+            modes.append(MowingMode.SPOT)
         return modes
+
+    @property
+    def selected_contour_id(self) -> list[int] | None:
+        """Return the selected contour ID, defaulting to the first available edge."""
+        self._normalize_selection_state()
+        if self._selected_contour_id is None:
+            return None
+        return [self._selected_contour_id[0], self._selected_contour_id[1]]
 
     async def async_set_selected_mowing_mode(self, mode: MowingMode) -> None:
         """Update the user-selected default mowing mode."""
+        self._normalize_selection_state()
+
         if mode not in self.selectable_mowing_modes:
             raise ValueError(f"Unsupported selectable mowing mode: {mode}")
 
@@ -293,8 +315,86 @@ class DreameMowerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         data = await self._async_update_data()
         self.async_set_updated_data(data)
 
+    async def async_set_selected_contour_id(self, contour_id: list[int] | None) -> None:
+        """Update the currently selected single contour ID."""
+        normalized_contour_id: tuple[int, int] | None = None
+        if contour_id is not None:
+            if len(contour_id) != 2:
+                raise ValueError(f"Unsupported contour ID: {contour_id}")
+            normalized_contour_id = (int(contour_id[0]), int(contour_id[1]))
+            if normalized_contour_id not in {(int(c[0]), int(c[1])) for c in self.contours}:
+                raise ValueError(f"Unsupported contour ID: {contour_id}")
+
+        if self._selected_contour_id == normalized_contour_id:
+            return
+
+        self._selected_contour_id = normalized_contour_id
+        data = await self._async_update_data()
+        self.async_set_updated_data(data)
+
+    @property
+    def selected_zone_id(self) -> int | None:
+        """Return the selected zone ID, defaulting to the first available zone."""
+        self._normalize_selection_state()
+        return self._selected_zone_id
+
+    @property
+    def selected_spot_area_id(self) -> int | None:
+        """Return the selected spot-area ID, defaulting to the first available spot."""
+        self._normalize_selection_state()
+        return self._selected_spot_area_id
+
+    async def async_set_selected_zone_id(self, zone_id: int | None) -> None:
+        """Update the currently selected single zone ID."""
+        if zone_id is not None and zone_id not in {int(zone["id"]) for zone in self.zones}:
+            raise ValueError(f"Unsupported zone ID: {zone_id}")
+
+        if self._selected_zone_id == zone_id:
+            return
+
+        self._selected_zone_id = zone_id
+        data = await self._async_update_data()
+        self.async_set_updated_data(data)
+
+    async def async_set_selected_spot_area_id(self, spot_area_id: int | None) -> None:
+        """Update the currently selected single spot area ID."""
+        if spot_area_id is not None and spot_area_id not in {int(spot_area["id"]) for spot_area in self.spot_areas}:
+            raise ValueError(f"Unsupported spot area ID: {spot_area_id}")
+
+        if self._selected_spot_area_id == spot_area_id:
+            return
+
+        self._selected_spot_area_id = spot_area_id
+        data = await self._async_update_data()
+        self.async_set_updated_data(data)
+
+    def _normalize_selection_state(self) -> None:
+        """Keep selections valid and default them to the first available option."""
+        available_contour_ids = [(int(contour[0]), int(contour[1])) for contour in self.contours]
+        if not available_contour_ids:
+            self._selected_contour_id = None
+        elif self._selected_contour_id not in available_contour_ids:
+            self._selected_contour_id = available_contour_ids[0]
+
+        available_zone_ids = [int(zone["id"]) for zone in self.zones]
+        if not available_zone_ids:
+            self._selected_zone_id = None
+        elif self._selected_zone_id not in available_zone_ids:
+            self._selected_zone_id = available_zone_ids[0]
+
+        available_spot_area_ids = [int(spot_area["id"]) for spot_area in self.spot_areas]
+        if not available_spot_area_ids:
+            self._selected_spot_area_id = None
+        elif self._selected_spot_area_id not in available_spot_area_ids:
+            self._selected_spot_area_id = available_spot_area_ids[0]
+
+        if self._selected_mowing_mode not in self.selectable_mowing_modes:
+            self._selected_mowing_mode = MowingMode.ALL_AREA
+
     def _handle_device_update(self, property_name: str, value: Any) -> None:
         """Handle device property updates and notify Home Assistant."""
+        self._normalize_selection_state()
+
         # Handle device code error notifications
         if property_name == DEVICE_CODE_ERROR_PROPERTY_NAME and isinstance(value, dict):
             # Create persistent notification for error device codes

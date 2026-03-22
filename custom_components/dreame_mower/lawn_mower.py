@@ -5,8 +5,11 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+import voluptuous as vol
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.exceptions import HomeAssistantError
+from homeassistant.helpers import entity_platform
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.components.lawn_mower import (  # type: ignore[attr-defined]
     LawnMowerActivity,
@@ -36,6 +39,18 @@ async def async_setup_entry(
 ) -> None:
     """Set up Dreame Mower lawn mower entity from a config entry."""
     coordinator: DreameMowerCoordinator = hass.data[DOMAIN][entry.entry_id][DATA_COORDINATOR]
+
+    platform = entity_platform.async_get_current_platform()
+    platform.async_register_entity_service(
+        "start_zone_mowing",
+        {vol.Required("zone_ids"): [vol.Coerce(int)]},
+        "async_start_zone_mowing",
+    )
+    platform.async_register_entity_service(
+        "start_spot_mowing",
+        {vol.Required("spot_area_ids"): [vol.Coerce(int)]},
+        "async_start_spot_mowing",
+    )
 
     entity = DreameMowerLawnMower(coordinator)
     async_add_entities([entity])
@@ -96,12 +111,37 @@ class DreameMowerLawnMower(DreameMowerEntity, LawnMowerEntity):
             mode = self.coordinator.selected_mowing_mode
             start_kwargs: dict[str, Any] = {"mode": mode}
             if mode == MowingMode.EDGE:
-                start_kwargs["contour_ids"] = self.coordinator.contours
+                selected_contour_id = self.coordinator.selected_contour_id
+                if selected_contour_id is None:
+                    raise HomeAssistantError("No edge is selected for edge mowing")
+                start_kwargs["contour_ids"] = [selected_contour_id]
+            elif mode == MowingMode.ZONE:
+                selected_zone_id = self.coordinator.selected_zone_id
+                if selected_zone_id is None:
+                    raise HomeAssistantError("No zone is selected for zone mowing")
+                start_kwargs["zone_ids"] = [selected_zone_id]
+            elif mode == MowingMode.SPOT:
+                selected_spot_area_id = self.coordinator.selected_spot_area_id
+                if selected_spot_area_id is None:
+                    raise HomeAssistantError("No spot is selected for spot mowing")
+                start_kwargs["spot_area_ids"] = [selected_spot_area_id]
 
             if not await self.coordinator.device.start_mowing(**start_kwargs):
                 _LOGGER.error("Failed to start mowing")
         except Exception as ex:
             _LOGGER.error("Exception while starting mowing: %s", ex)
+            if isinstance(ex, HomeAssistantError):
+                raise
+
+    async def async_start_zone_mowing(self, zone_ids: list[int]) -> None:
+        """Start mowing for one or more explicit zone IDs."""
+        if not await self.coordinator.device.start_mowing_zones(zone_ids):
+            raise HomeAssistantError(f"Failed to start zone mowing for zone IDs: {zone_ids}")
+
+    async def async_start_spot_mowing(self, spot_area_ids: list[int]) -> None:
+        """Start mowing for one or more explicit spot-area IDs."""
+        if not await self.coordinator.device.start_mowing_spots(spot_area_ids):
+            raise HomeAssistantError(f"Failed to start spot mowing for spot IDs: {spot_area_ids}")
 
     @property
     def extra_state_attributes(self) -> dict[str, Any]:
@@ -123,6 +163,12 @@ class DreameMowerLawnMower(DreameMowerEntity, LawnMowerEntity):
         if task_target_map_id is not None:
             attributes["task_target_map_id"] = task_target_map_id
         attributes["selected_mowing_mode"] = self.coordinator.selected_mowing_mode.value
+        if self.coordinator.selected_contour_id is not None:
+            attributes["selected_contour_id"] = self.coordinator.selected_contour_id
+        if self.coordinator.selected_zone_id is not None:
+            attributes["selected_zone_id"] = self.coordinator.selected_zone_id
+        if self.coordinator.selected_spot_area_id is not None:
+            attributes["selected_spot_area_id"] = self.coordinator.selected_spot_area_id
         return attributes
 
     async def async_pause(self) -> None:

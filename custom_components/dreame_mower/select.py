@@ -17,6 +17,8 @@ from .entity import DreameMowerEntity
 _MOWING_MODE_LABELS: dict[MowingMode, str] = {
     MowingMode.ALL_AREA: "All area",
     MowingMode.EDGE: "Edge",
+    MowingMode.ZONE: "Zone",
+    MowingMode.SPOT: "Spot",
 }
 
 
@@ -31,6 +33,9 @@ async def async_setup_entry(
         [
             DreameMowerMapSelect(coordinator),
             DreameMowerMowingActionSelect(coordinator),
+            DreameMowerEdgeSelect(coordinator),
+            DreameMowerZoneSelect(coordinator),
+            DreameMowerSpotSelect(coordinator),
         ]
     )
 
@@ -111,3 +116,146 @@ class DreameMowerMowingActionSelect(DreameMowerEntity, SelectEntity):
                 return
 
         raise ValueError(f"Unknown mowing action option: {option}")
+
+
+class DreameMowerEdgeSelect(DreameMowerEntity, SelectEntity):
+    """Select entity for a single target edge contour."""
+
+    def __init__(self, coordinator: DreameMowerCoordinator) -> None:
+        """Initialize the edge select entity."""
+        super().__init__(coordinator, "edge_select")
+        self._attr_name = "Edge"
+        self._attr_icon = "mdi:vector-polyline"
+
+    @property
+    def options(self) -> list[str]:
+        """Return the available edge-contour options."""
+        return [self._option_label(contour) for contour in self.coordinator.contours]
+
+    @property
+    def current_option(self) -> str | None:
+        """Return the selected edge-contour option."""
+        selected_contour_id = self.coordinator.selected_contour_id
+        if selected_contour_id is None:
+            return None
+
+        for contour in self.coordinator.contours:
+            if contour == selected_contour_id:
+                return self._option_label(contour)
+
+        return None
+
+    async def async_select_option(self, option: str) -> None:
+        """Select a single target edge contour for edge mowing."""
+        contour_id = self._id_from_option(option)
+        if contour_id is None:
+            raise ValueError(f"Unknown edge option: {option}")
+
+        await self.coordinator.async_set_selected_contour_id(contour_id)
+
+    def _option_label(self, contour: list[int]) -> str:
+        """Return the label shown for an edge-contour option."""
+        return f"Edge ({contour[0]}, {contour[1]})"
+
+    def _id_from_option(self, option: str) -> list[int] | None:
+        """Resolve a select option back to its contour ID."""
+        for contour in self.coordinator.contours:
+            if self._option_label(contour) == option:
+                return contour
+        return None
+
+
+class DreameMowerZoneSelect(DreameMowerEntity, SelectEntity):
+    """Select entity for a single target zone."""
+
+    def __init__(self, coordinator: DreameMowerCoordinator) -> None:
+        """Initialize the zone select entity."""
+        super().__init__(coordinator, "zone_select")
+        self._attr_name = "Zone"
+        self._attr_icon = "mdi:texture-box"
+
+    @property
+    def options(self) -> list[str]:
+        """Return the available zone options."""
+        return [self._option_label(zone) for zone in self.coordinator.zones]
+
+    @property
+    def current_option(self) -> str | None:
+        """Return the selected zone option."""
+        selected_zone_id = self.coordinator.selected_zone_id
+        if selected_zone_id is None:
+            return None
+
+        for zone in self.coordinator.zones:
+            if int(zone["id"]) == selected_zone_id:
+                return self._option_label(zone)
+
+        return None
+
+    async def async_select_option(self, option: str) -> None:
+        """Select a single target zone for zone mowing."""
+        zone_id = self._id_from_option(option)
+        if zone_id is None:
+            raise ValueError(f"Unknown zone option: {option}")
+
+        await self.coordinator.async_set_selected_zone_id(zone_id)
+
+    def _option_label(self, zone: dict[str, Any]) -> str:
+        """Return the label shown for a zone option."""
+        name = zone.get("name") or f"Zone {zone['id']}"
+        return f"{name} (#{zone['id']})"
+
+    def _id_from_option(self, option: str) -> int | None:
+        """Resolve a select option back to its zone ID."""
+        for zone in self.coordinator.zones:
+            if self._option_label(zone) == option:
+                return int(zone["id"])
+        return None
+
+
+class DreameMowerSpotSelect(DreameMowerEntity, SelectEntity):
+    """Select entity for a single target spot area."""
+
+    def __init__(self, coordinator: DreameMowerCoordinator) -> None:
+        """Initialize the spot select entity."""
+        super().__init__(coordinator, "spot_select")
+        self._attr_name = "Spot"
+        self._attr_icon = "mdi:map-marker-radius"
+
+    @property
+    def options(self) -> list[str]:
+        """Return the available spot-area options."""
+        return [self._option_label(spot_area) for spot_area in self.coordinator.spot_areas]
+
+    @property
+    def current_option(self) -> str | None:
+        """Return the selected spot-area option."""
+        selected_spot_area_id = self.coordinator.selected_spot_area_id
+        if selected_spot_area_id is None:
+            return None
+
+        for spot_area in self.coordinator.spot_areas:
+            if int(spot_area["id"]) == selected_spot_area_id:
+                return self._option_label(spot_area)
+
+        return None
+
+    async def async_select_option(self, option: str) -> None:
+        """Select a single target spot area for spot mowing."""
+        spot_area_id = self._id_from_option(option)
+        if spot_area_id is None:
+            raise ValueError(f"Unknown spot option: {option}")
+
+        await self.coordinator.async_set_selected_spot_area_id(spot_area_id)
+
+    def _option_label(self, spot_area: dict[str, Any]) -> str:
+        """Return the label shown for a spot-area option."""
+        name = spot_area.get("name") or f"Spot {spot_area['id']}"
+        return f"{name} (#{spot_area['id']})"
+
+    def _id_from_option(self, option: str) -> int | None:
+        """Resolve a select option back to its spot-area ID."""
+        for spot_area in self.coordinator.spot_areas:
+            if self._option_label(spot_area) == option:
+                return int(spot_area["id"])
+        return None
