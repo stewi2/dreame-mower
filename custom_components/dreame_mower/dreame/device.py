@@ -76,6 +76,7 @@ from .const import (
     ACTION_DOCK,
     DEVICE_CODE_PROPERTY,
     PROPERTY_1_1,
+    DeviceStatus,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -907,37 +908,64 @@ class DreameMowerDevice:
         self._notify_property_change("activity", "mowing")
         return True
 
+    def _validate_zone_ids(self, zone_ids: list[int]) -> bool:
+        """Return True when all requested zone IDs exist in the loaded map."""
+        if self._vector_map is None:
+            return True
+
+        available_zone_ids = {zone.zone_id for zone in self._vector_map.zones}
+        invalid_zone_ids = [zone_id for zone_id in zone_ids if zone_id not in available_zone_ids]
+        if invalid_zone_ids:
+            _LOGGER.error(
+                "Requested unknown zone IDs %s; available zones: %s",
+                invalid_zone_ids,
+                sorted(available_zone_ids),
+            )
+            return False
+
+        return True
+
+    def _build_zone_task_payload(self, zone_ids: list[int]) -> dict[str, Any]:
+        """Build the 2:50 action payload for a zone-selective mowing session."""
+        return {
+            "m": "a",
+            "p": 0,
+            "o": 102,
+            "d": {
+                "region": zone_ids,
+            },
+        }
+
+    async def _send_zone_task_payload(self, task_payload: dict[str, Any]) -> Any:
+        """Send the zone selection payload via action 2:50."""
+        _LOGGER.debug(
+            "Sending zone mowing action %s:%s with payload: %s",
+            SCHEDULING_TASK_PROPERTY.siid,
+            SCHEDULING_TASK_PROPERTY.piid,
+            task_payload,
+        )
+        return await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: self._cloud_device.action(
+                SCHEDULING_TASK_PROPERTY.siid,
+                SCHEDULING_TASK_PROPERTY.piid,
+                [task_payload],
+            ),
+        )
+
     async def start_mowing_zones(self, zone_ids: list[int]) -> bool:
         """Start mowing specific zones by their IDs.
-
-        Sends property 2:50 with the selected zone IDs to trigger zone-selective mowing.
         """
         if not zone_ids:
             _LOGGER.error("start_mowing_zones called with empty zone_ids")
             return False
 
-        task_payload = {
-            "t": "TASK",  # message type discriminator — always "TASK"
-            "d": {
-                "area_id": [],       # spot/area IDs (separate concept from zones) — unused here
-                "exe": True,         # execution flag: True = start
-                "o": 102,            # operation mode: 102 = zone-selective mowing
-                                     # (confirmed by mission data "mode": 102 field)
-                "region_id": zone_ids,  # zone IDs from the vector map to mow
-                "status": True,      # task accepted / active
-                "time": 0,           # cumulative elapsed seconds; device ignores on a new session
-            },
-        }
+        if not self._validate_zone_ids(zone_ids):
+            return False
 
+        task_payload = self._build_zone_task_payload(zone_ids)
         try:
-            result = await asyncio.get_event_loop().run_in_executor(
-                None,
-                lambda: self._cloud_device.set_property(
-                    SCHEDULING_TASK_PROPERTY.siid,
-                    SCHEDULING_TASK_PROPERTY.piid,
-                    task_payload,
-                ),
-            )
+            result = await self._send_zone_task_payload(task_payload)
         except Exception as ex:
             _LOGGER.error("Failed to send start_mowing_zones command: %s", ex)
             return False

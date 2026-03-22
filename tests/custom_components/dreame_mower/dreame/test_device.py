@@ -6,6 +6,7 @@ from datetime import datetime
 from unittest.mock import AsyncMock, Mock, patch, PropertyMock
 
 from custom_components.dreame_mower.dreame.device import DreameMowerDevice
+from custom_components.dreame_mower.dreame.const import DeviceStatus
 
 
 class MockCloudDevice:
@@ -17,6 +18,8 @@ class MockCloudDevice:
         self._connected_callback = None
         self._disconnected_callback = None
         self.device_id = "test_device_123"  # Add device_id for execute_action method
+        self.action_calls = []
+        self.set_property_calls = []
     
     @property
     def connected(self) -> bool:
@@ -69,6 +72,7 @@ class MockCloudDevice:
 
     def action(self, siid: int, aiid: int, parameters=None, retry_count: int = 2):
         """Mock action call; return a boolean to indicate success."""
+        self.action_calls.append((siid, aiid, parameters, retry_count))
         # For tests we just return True to indicate success
         return True
 
@@ -77,6 +81,13 @@ class MockCloudDevice:
         if not self.connected:
             return False
         return self.action(action.siid, action.aiid)
+
+    def set_property(self, siid: int, piid: int, value=None, retry_count: int = 2):
+        """Mock property write used by zone selection tests."""
+        if not self.connected:
+            return False
+        self.set_property_calls.append((siid, piid, value, retry_count))
+        return True
 
 
 @pytest.fixture
@@ -214,6 +225,61 @@ async def test_pause_when_disconnected(device):
     """Test pause when device is disconnected."""
     result = await device.pause()
     assert result is False
+
+
+@pytest.mark.asyncio
+async def test_start_mowing_zones_uses_zone_action_payload(device):
+    """Zone mowing should use the zone action payload."""
+    device._cloud_device.set_connected_state(True)
+    await device.connect()
+    device._status_code = DeviceStatus.CHARGING
+
+    result = await device.start_mowing_zones([1])
+
+    assert result is True
+    assert len(device._cloud_device.action_calls) == 1
+    assert len(device._cloud_device.set_property_calls) == 0
+
+    siid, aiid, parameters, retry_count = device._cloud_device.action_calls[0]
+    assert (siid, aiid) == (2, 50)
+    assert parameters == [{"m": "a", "p": 0, "o": 102, "d": {"region": [1]}}]
+
+
+@pytest.mark.asyncio
+async def test_start_mowing_zones_does_not_reuse_elapsed_time(device):
+    """Zone mowing should not add elapsed time to the action payload."""
+    device._cloud_device.set_connected_state(True)
+    await device.connect()
+    device._status_code = DeviceStatus.MOWING
+    device._scheduling_handler.handle_property_update(
+        2,
+        50,
+        {"t": "TASK", "d": {"exe": True, "o": 6, "status": True, "time": 13197}},
+        lambda *_: None,
+    )
+
+    result = await device.start_mowing_zones([1, 3])
+
+    assert result is True
+    assert len(device._cloud_device.action_calls) == 1
+    assert len(device._cloud_device.set_property_calls) == 0
+
+    _, _, parameters, _ = device._cloud_device.action_calls[0]
+    assert parameters == [{"m": "a", "p": 0, "o": 102, "d": {"region": [1, 3]}}]
+
+
+@pytest.mark.asyncio
+async def test_start_mowing_zones_rejects_unknown_zone_ids(device):
+    """Zone mowing should reject zone IDs that are not present in the loaded map."""
+    device._cloud_device.set_connected_state(True)
+    await device.connect()
+    device._vector_map = Mock(zones=[Mock(zone_id=1), Mock(zone_id=2)])
+
+    result = await device.start_mowing_zones([3])
+
+    assert result is False
+    assert len(device._cloud_device.action_calls) == 0
+    assert len(device._cloud_device.set_property_calls) == 0
 
 
 @pytest.mark.asyncio

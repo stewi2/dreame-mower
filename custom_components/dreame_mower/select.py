@@ -88,6 +88,8 @@ class DreameMowerZoneSelect(DreameMowerEntity, SelectEntity):
         if option == ALL_ZONES_OPTION:
             self.coordinator.selected_zone_id = None
         else:
+            # TODO: Support selecting multiple zones from the UI; this select entity
+            # currently persists only a single selected zone ID.
             zone = next(
                 (z for z in self.coordinator.zones if z["name"] == option), None
             )
