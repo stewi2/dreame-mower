@@ -49,6 +49,17 @@ class MowerContour:
 
 
 @dataclass
+class MowerSpotArea:
+    """A spot-mowing area defined by a polygon boundary."""
+
+    area_id: int
+    path: list[tuple[int, int]]
+    name: str = ""
+    shape_type: int = 0
+    area: float = 0
+
+
+@dataclass
 class MowerAvailableMap:
     """A discovered map entry that can be targeted by map-aware mowing tasks."""
 
@@ -86,6 +97,7 @@ class MowerMowPath:
 class MowerVectorMap:
     """Complete vector map data for a mower, fetched from batch API."""
     zones: list[MowerZone] = field(default_factory=list)
+    spot_areas: list[MowerSpotArea] = field(default_factory=list)
     forbidden_areas: list[MowerZone] = field(default_factory=list)
     paths: list[MowerPath] = field(default_factory=list)
     contours: list[MowerContour] = field(default_factory=list)
@@ -175,6 +187,17 @@ def parse_mower_map(map_json_str: str) -> MowerVectorMap:
             area=zone_data.get("area", 0),
             time=zone_data.get("time", 0),
             etime=zone_data.get("etime", 0),
+        ))
+
+    # Parse spot-mowing areas
+    for entry in _parse_polygon_list(data.get("spotAreas", {})):
+        area_id, area_data = entry[0], entry[1]
+        vmap.spot_areas.append(MowerSpotArea(
+            area_id=int(area_id),
+            path=_extract_path_coords(area_data.get("path", [])),
+            name=area_data.get("name", ""),
+            shape_type=area_data.get("shapeType", 0),
+            area=area_data.get("area", 0),
         ))
 
     # Parse forbidden areas

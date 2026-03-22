@@ -10,6 +10,7 @@ TODO: Implement connection retry logic
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Iterable
 from enum import Enum
 import logging
 import os
@@ -968,6 +969,7 @@ class DreameMowerDevice:
         return mode in {
             MowingMode.ALL_AREA,
             MowingMode.EDGE,
+            MowingMode.SPOT,
             MowingMode.ZONE,
         }
 
@@ -1138,6 +1140,212 @@ class DreameMowerDevice:
                 "region": zone_ids,
             },
         }
+
+    def _validate_spot_area_ids(self, spot_area_ids: list[int]) -> bool:
+        """Return True when all requested spot area IDs exist in the loaded map."""
+        if self._vector_map is None:
+            return True
+
+        available_spot_area_ids = {spot_area.area_id for spot_area in self._vector_map.spot_areas}
+        invalid_spot_area_ids = [spot_area_id for spot_area_id in spot_area_ids if spot_area_id not in available_spot_area_ids]
+        if invalid_spot_area_ids:
+            _LOGGER.error(
+                "Requested unknown spot area IDs %s; available spot areas: %s",
+                invalid_spot_area_ids,
+                sorted(available_spot_area_ids),
+            )
+            return False
+
+        return True
+
+    def _build_spot_task_payload(self, spot_area_ids: list[int]) -> dict[str, Any]:
+        """Build the verified 2:50 action payload for spot mowing."""
+        return {
+            "m": "a",
+            "p": 0,
+            "o": 103,
+            "d": {
+                "area": spot_area_ids,
+            },
+        }
+
+    def _build_spot_rectangle_payload(
+        self,
+        x_min: float,
+        y_min: float,
+        x_max: float,
+        y_max: float,
+    ) -> dict[str, Any]:
+        """Build the 2:50 action payload for defining a rectangular spot area."""
+        return {
+            "m": "a",
+            "p": 0,
+            "o": 214,
+            "d": {
+                "id": -1,
+                "points": [
+                    [round(x_max, 2), round(y_min, 2)],
+                    [round(x_min, 2), round(y_min, 2)],
+                    [round(x_min, 2), round(y_max, 2)],
+                    [round(x_max, 2), round(y_max, 2)],
+                ],
+            },
+        }
+
+    def _build_apply_spot_selection_payload(self) -> dict[str, Any]:
+        """Build the 2:50 action payload for applying a prepared spot selection."""
+        return {
+            "m": "a",
+            "p": 1,
+            "o": 201,
+        }
+
+    def _map_bounds_in_meters(self) -> tuple[float, float, float, float] | None:
+        """Return map bounds in meters when vector-map geometry is available."""
+        if self._vector_map is None:
+            return None
+
+        if self._vector_map.boundary is not None:
+            return (
+                self._vector_map.boundary.x1 / 100.0,
+                self._vector_map.boundary.y1 / 100.0,
+                self._vector_map.boundary.x2 / 100.0,
+                self._vector_map.boundary.y2 / 100.0,
+            )
+
+        all_paths: list[Iterable[tuple[int, int]]] = [
+            zone.path for zone in self._vector_map.zones
+        ] + [
+            zone.path for zone in self._vector_map.forbidden_areas
+        ] + [
+            path.path for path in self._vector_map.paths
+        ] + [
+            contour.path for contour in self._vector_map.contours
+        ] + [
+            spot_area.path for spot_area in self._vector_map.spot_areas
+        ]
+
+        points = [point for path in all_paths for point in path]
+        if not points:
+            return None
+
+        x_values = [point[0] for point in points]
+        y_values = [point[1] for point in points]
+        return (
+            min(x_values) / 100.0,
+            min(y_values) / 100.0,
+            max(x_values) / 100.0,
+            max(y_values) / 100.0,
+        )
+
+    def _normalize_spot_rectangle(
+        self,
+        spot_rectangle: dict[str, int | float],
+    ) -> tuple[float, float, float, float] | None:
+        """Validate and normalize a spot rectangle expressed in meters."""
+        required_keys = ("x1", "y1", "x2", "y2")
+        missing_keys = [key for key in required_keys if key not in spot_rectangle]
+        if missing_keys:
+            _LOGGER.error(
+                "Spot rectangle is missing required keys %s: %s",
+                missing_keys,
+                spot_rectangle,
+            )
+            return None
+
+        try:
+            x1 = float(spot_rectangle["x1"])
+            y1 = float(spot_rectangle["y1"])
+            x2 = float(spot_rectangle["x2"])
+            y2 = float(spot_rectangle["y2"])
+        except (TypeError, ValueError) as ex:
+            _LOGGER.error("Spot rectangle must contain numeric coordinates %s: %s", spot_rectangle, ex)
+            return None
+
+        x_min, x_max = sorted((x1, x2))
+        y_min, y_max = sorted((y1, y2))
+
+        if x_max - x_min < 1.0 or y_max - y_min < 1.0:
+            _LOGGER.error(
+                "Spot rectangle must be at least 1m x 1m; got %.2fm x %.2fm: %s",
+                x_max - x_min,
+                y_max - y_min,
+                spot_rectangle,
+            )
+            return None
+
+        map_bounds = self._map_bounds_in_meters()
+        if map_bounds is not None:
+            map_x_min, map_y_min, map_x_max, map_y_max = map_bounds
+            overlaps_map = (
+                x_max > map_x_min
+                and x_min < map_x_max
+                and y_max > map_y_min
+                and y_min < map_y_max
+            )
+            if not overlaps_map:
+                _LOGGER.error(
+                    "Spot rectangle must overlap the known map extent %s; got: %s",
+                    map_bounds,
+                    spot_rectangle,
+                )
+                return None
+
+        return (x_min, y_min, x_max, y_max)
+
+    def _spot_area_matches_rectangle(
+        self,
+        spot_area: Any,
+        rectangle_bounds: tuple[float, float, float, float],
+        tolerance_m: float = 0.15,
+    ) -> bool:
+        """Return True when a spot area's geometry matches the requested rectangle."""
+        if not getattr(spot_area, "path", None):
+            return False
+
+        x_values = [point[0] / 100.0 for point in spot_area.path]
+        y_values = [point[1] / 100.0 for point in spot_area.path]
+        spot_bounds = (min(x_values), min(y_values), max(x_values), max(y_values))
+
+        return all(
+            abs(actual - expected) <= tolerance_m
+            for actual, expected in zip(spot_bounds, rectangle_bounds)
+        )
+
+    def _resolve_spot_area_id_from_rectangle(
+        self,
+        previous_spot_area_ids: set[int],
+        rectangle_bounds: tuple[float, float, float, float],
+    ) -> int | None:
+        """Resolve the spot-area ID created from a rectangle after a map refresh."""
+        if self._vector_map is None:
+            return None
+
+        new_spot_areas = [
+            spot_area
+            for spot_area in self._vector_map.spot_areas
+            if spot_area.area_id not in previous_spot_area_ids
+        ]
+        if len(new_spot_areas) == 1:
+            return int(new_spot_areas[0].area_id)
+
+        matching_new_spot_areas = [
+            spot_area
+            for spot_area in new_spot_areas
+            if self._spot_area_matches_rectangle(spot_area, rectangle_bounds)
+        ]
+        if len(matching_new_spot_areas) == 1:
+            return int(matching_new_spot_areas[0].area_id)
+
+        matching_spot_areas = [
+            spot_area
+            for spot_area in self._vector_map.spot_areas
+            if self._spot_area_matches_rectangle(spot_area, rectangle_bounds)
+        ]
+        if len(matching_spot_areas) == 1:
+            return int(matching_spot_areas[0].area_id)
+
+        return None
 
     async def start_mowing_all_area(self, map_id: int | None = None) -> bool:
         """Start all-area mowing, optionally targeting a specific map identifier."""
@@ -1312,6 +1520,95 @@ class DreameMowerDevice:
         self._notify_property_change("activity", "mowing")
         return True
 
+    async def start_mowing_spots(self, spot_area_ids: list[int]) -> bool:
+        """Start spot mowing for one or more predefined spot areas."""
+        if not spot_area_ids:
+            _LOGGER.error("start_mowing_spots called with empty spot_area_ids")
+            return False
+
+        if not self._validate_spot_area_ids(spot_area_ids):
+            return False
+
+        task_payload = self._build_spot_task_payload(spot_area_ids)
+        try:
+            result = await self._send_task_payload("spot mowing", task_payload)
+        except Exception as ex:
+            _LOGGER.error("Failed to send start_mowing_spots command: %s", ex)
+            return False
+
+        if not result:
+            _LOGGER.error("start_mowing_spots command returned falsy result: %s", result)
+            return False
+
+        _LOGGER.info("Spot mowing started for spot areas: %s", spot_area_ids)
+        self._pose_coverage_handler.reset_mission_completion()
+        self._notify_property_change("activity", "mowing")
+        return True
+
+    async def create_spot_area(self, spot_rectangle: dict[str, int | float]) -> int | None:
+        """Create a spot area from a rectangle and return its resolved area id."""
+        normalized_rectangle = self._normalize_spot_rectangle(spot_rectangle)
+        if normalized_rectangle is None:
+            return None
+
+        previous_spot_area_ids = (
+            {spot_area.area_id for spot_area in self._vector_map.spot_areas}
+            if self._vector_map is not None
+            else set()
+        )
+
+        create_payload = self._build_spot_rectangle_payload(*normalized_rectangle)
+        try:
+            create_result = await self._send_task_payload("spot area create", create_payload)
+        except Exception as ex:
+            _LOGGER.error("Failed to send spot area create command: %s", ex)
+            return None
+
+        if not create_result:
+            _LOGGER.error("spot area create command returned falsy result: %s", create_result)
+            return None
+
+        apply_payload = self._build_apply_spot_selection_payload()
+        try:
+            apply_result = await self._send_task_payload("spot area apply", apply_payload)
+        except Exception as ex:
+            _LOGGER.error("Failed to send spot area apply command: %s", ex)
+            return None
+
+        if not apply_result:
+            _LOGGER.error("spot area apply command returned falsy result: %s", apply_result)
+            return None
+
+        created_spot_area_id = None
+        for _ in range(3):
+            await asyncio.get_event_loop().run_in_executor(None, self.fetch_vector_map)
+            created_spot_area_id = self._resolve_spot_area_id_from_rectangle(
+                previous_spot_area_ids,
+                normalized_rectangle,
+            )
+            if created_spot_area_id is not None:
+                _LOGGER.info(
+                    "Spot area created from rectangle %s with resolved area id %s",
+                    spot_rectangle,
+                    created_spot_area_id,
+                )
+                return created_spot_area_id
+            await asyncio.sleep(0.5)
+
+        _LOGGER.error(
+            "Spot rectangle was prepared successfully, but the created spot area ID could not be resolved from refreshed map data: %s",
+            spot_rectangle,
+        )
+        return None
+
+    async def start_mowing_spot(self, spot_area_ids: list[int] | None = None) -> bool:
+        """Start spot mowing for one or more existing spot areas."""
+        if not spot_area_ids:
+            _LOGGER.error("Spot mowing requires at least one existing spot area ID")
+            return False
+
+        return await self.start_mowing_spots(spot_area_ids)
+
     async def start_mowing_mode(
         self,
         mode: MowingMode,
@@ -1319,12 +1616,13 @@ class DreameMowerDevice:
         map_id: int | None = None,
         zone_ids: list[int] | None = None,
         contour_ids: list[list[int]] | None = None,
-        spot_rectangle: dict[str, int] | None = None,
+        spot_area_ids: list[int] | None = None,
+        spot_rectangle: dict[str, int | float] | None = None,
     ) -> bool:
         """Start mowing using an explicit mode-oriented API.
 
-        Spot and manual modes are represented explicitly so higher layers can model
-        the full roadmap, but their outbound command format is still unverified.
+        Manual mode is represented explicitly so higher layers can model the full
+        roadmap, but its outbound command format is still unverified.
         """
         if mode == MowingMode.ALL_AREA:
             return await self.start_mowing_all_area(map_id)
@@ -1342,11 +1640,14 @@ class DreameMowerDevice:
             return await self.start_mowing_edges(contour_ids)
 
         if mode == MowingMode.SPOT:
-            _LOGGER.error(
-                "Spot mowing is not implemented yet; rectangle payload format is still unverified: %s",
-                spot_rectangle,
+            if spot_rectangle is not None:
+                _LOGGER.error(
+                    "Spot rectangle creation is separate from spot mowing; create the spot area first, then call spot mowing with spot_area_ids"
+                )
+                return False
+            return await self.start_mowing_spot(
+                spot_area_ids=spot_area_ids,
             )
-            return False
 
         if mode == MowingMode.MANUAL:
             _LOGGER.error("Manual mowing is not implemented yet; it appears to require Bluetooth")
@@ -1375,6 +1676,16 @@ class DreameMowerDevice:
         if self._vector_map is None:
             return []
         return [list(contour.contour_id) for contour in self._vector_map.contours]
+
+    @property
+    def spot_areas(self) -> list[dict]:
+        """Return available spot-mowing area IDs from the vector map."""
+        if self._vector_map is None:
+            return []
+        return [
+            {"id": spot_area.area_id, "name": spot_area.name, "area": spot_area.area}
+            for spot_area in self._vector_map.spot_areas
+        ]
 
     async def pause(self) -> bool:
         """Pause current operation."""

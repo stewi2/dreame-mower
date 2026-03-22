@@ -396,15 +396,149 @@ async def test_start_mowing_mode_delegates_to_verified_mode(device):
 
 
 @pytest.mark.asyncio
-async def test_start_mowing_mode_rejects_unverified_spot_mode(device):
-    """Spot mode should remain explicitly unsupported until the payload is verified."""
+async def test_start_mowing_spots_uses_verified_spot_payload(device):
+    """Spot mowing should use the verified 2:50 payload with o=103 and d.area."""
+    device._cloud_device.set_connected_state(True)
+    await device.connect()
+
+    result = await device.start_mowing_spots([4])
+
+    assert result is True
+    _, _, parameters, _ = device._cloud_device.action_calls[0]
+    assert parameters == [{"m": "a", "p": 0, "o": 103, "d": {"area": [4]}}]
+
+
+@pytest.mark.asyncio
+async def test_start_mowing_spots_rejects_unknown_spot_area_ids(device):
+    """Spot mowing should reject spot area IDs that are not present in the loaded map."""
+    device._cloud_device.set_connected_state(True)
+    await device.connect()
+    device._vector_map = Mock(spot_areas=[Mock(area_id=1), Mock(area_id=2)])
+
+    result = await device.start_mowing_spots([3])
+
+    assert result is False
+    assert len(device._cloud_device.action_calls) == 0
+
+
+@pytest.mark.asyncio
+async def test_start_mowing_mode_delegates_to_verified_spot_mode(device):
+    """The mode-oriented API should delegate to the verified spot flow."""
+    device._cloud_device.set_connected_state(True)
+    await device.connect()
+
+    result = await device.start_mowing_mode(MowingMode.SPOT, spot_area_ids=[4])
+
+    assert result is True
+    _, _, parameters, _ = device._cloud_device.action_calls[0]
+    assert parameters == [{"m": "a", "p": 0, "o": 103, "d": {"area": [4]}}]
+
+
+@pytest.mark.asyncio
+async def test_create_spot_area_creates_rectangle_and_returns_created_spot_id(device):
+    """Rectangle spot creation should create the spot, apply it, and return the new spot area ID."""
+    device._cloud_device.set_connected_state(True)
+    await device.connect()
+
+    device._vector_map = SimpleNamespace(
+        spot_areas=[SimpleNamespace(area_id=1, path=[(-100, -100), (0, -100), (0, 0), (-100, 0)])],
+        boundary=SimpleNamespace(x1=-500, y1=-500, x2=500, y2=500),
+        zones=[],
+        forbidden_areas=[],
+        paths=[],
+        contours=[],
+    )
+
+    def refresh_vector_map():
+        device._vector_map = SimpleNamespace(
+            spot_areas=[
+                SimpleNamespace(area_id=1, path=[(-100, -100), (0, -100), (0, 0), (-100, 0)]),
+                SimpleNamespace(area_id=2, path=[(100, 100), (300, 100), (300, 300), (100, 300)]),
+            ],
+            boundary=SimpleNamespace(x1=-500, y1=-500, x2=500, y2=500),
+            zones=[],
+            forbidden_areas=[],
+            paths=[],
+            contours=[],
+        )
+        return True
+
+    device.fetch_vector_map = refresh_vector_map
+
+    result = await device.create_spot_area({"x1": 1, "y1": 1, "x2": 3, "y2": 3})
+
+    assert result == 2
+    assert len(device._cloud_device.action_calls) == 2
+
+    _, _, create_parameters, _ = device._cloud_device.action_calls[0]
+    assert create_parameters == [{
+        "m": "a",
+        "p": 0,
+        "o": 214,
+        "d": {
+            "id": -1,
+            "points": [[3.0, 1.0], [1.0, 1.0], [1.0, 3.0], [3.0, 3.0]],
+        },
+    }]
+
+    _, _, apply_parameters, _ = device._cloud_device.action_calls[1]
+    assert apply_parameters == [{"m": "a", "p": 1, "o": 201}]
+
+
+@pytest.mark.asyncio
+async def test_start_mowing_mode_rejects_rectangle_spot_flow(device):
+    """The mode-oriented API should not combine spot creation with spot mowing."""
     device._cloud_device.set_connected_state(True)
     await device.connect()
 
     result = await device.start_mowing_mode(
         MowingMode.SPOT,
-        spot_rectangle={"x1": 1, "y1": 2, "x2": 3, "y2": 4},
+        spot_rectangle={"x1": 0, "y1": 0, "x2": 2, "y2": 2},
     )
+
+    assert result is False
+    assert len(device._cloud_device.action_calls) == 0
+
+
+@pytest.mark.asyncio
+async def test_create_spot_area_rejects_too_small_rectangle(device):
+    """Rectangle spot creation should reject rectangles smaller than 1m x 1m."""
+    device._cloud_device.set_connected_state(True)
+    await device.connect()
+
+    result = await device.create_spot_area({"x1": 1, "y1": 1, "x2": 1.5, "y2": 2})
+
+    assert result is None
+    assert len(device._cloud_device.action_calls) == 0
+
+
+@pytest.mark.asyncio
+async def test_create_spot_area_rejects_rectangle_outside_map(device):
+    """Rectangle spot creation should reject rectangles that do not overlap the map."""
+    device._cloud_device.set_connected_state(True)
+    await device.connect()
+    device._vector_map = SimpleNamespace(
+        spot_areas=[],
+        boundary=SimpleNamespace(x1=-500, y1=-500, x2=500, y2=500),
+        zones=[],
+        forbidden_areas=[],
+        paths=[],
+        contours=[],
+    )
+
+    result = await device.create_spot_area({"x1": 6, "y1": 6, "x2": 8, "y2": 8})
+
+    assert result is None
+    assert len(device._cloud_device.action_calls) == 0
+
+
+@pytest.mark.asyncio
+async def test_start_mowing_spot_requires_existing_spot_ids(device):
+    """Spot mowing should remain a pure start operation over existing spot IDs."""
+    device._cloud_device.set_connected_state(True)
+    await device.connect()
+
+    result = await device.start_mowing_spot()
 
     assert result is False
     assert len(device._cloud_device.action_calls) == 0
@@ -452,6 +586,21 @@ def test_available_maps_returns_serializable_map_entries(device):
         {"id": 2, "index": 1, "name": "Back", "area": 30.5},
     ]
     assert len(device._cloud_device.action_calls) == 0
+
+
+def test_spot_areas_returns_serializable_entries(device):
+    """Spot areas should expose stable dicts for higher layers."""
+    device._vector_map = SimpleNamespace(
+        spot_areas=[
+            SimpleNamespace(area_id=4, name="Tree", area=2.5),
+            SimpleNamespace(area_id=5, name="Bench", area=1.2),
+        ]
+    )
+
+    assert device.spot_areas == [
+        {"id": 4, "name": "Tree", "area": 2.5},
+        {"id": 5, "name": "Bench", "area": 1.2},
+    ]
 
 
 def test_refresh_current_map_id_reads_active_map_from_mapl(device):

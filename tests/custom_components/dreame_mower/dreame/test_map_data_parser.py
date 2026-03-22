@@ -126,6 +126,22 @@ def test_parse_mower_map_contours():
     assert result.contours[0].path == [(5, 6)]
 
 
+def test_parse_mower_map_spot_areas():
+    map_json = _make_map_json(
+        spotAreas={
+            "dataType": "Map",
+            "value": [
+                [4, {"path": [{"x": 7, "y": 8}], "name": "Tree", "area": 2.5, "shapeType": 1}],
+            ],
+        }
+    )
+    result = parse_mower_map(map_json)
+    assert len(result.spot_areas) == 1
+    assert result.spot_areas[0].area_id == 4
+    assert result.spot_areas[0].path == [(7, 8)]
+    assert result.spot_areas[0].name == "Tree"
+
+
 # ---------------------------------------------------------------------------
 # parse_mow_paths
 # ---------------------------------------------------------------------------
