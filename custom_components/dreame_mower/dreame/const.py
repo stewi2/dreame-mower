@@ -51,6 +51,7 @@ SERVICE1_PROPERTY_50 = PropertyIdentifier(siid=1, piid=50, name="service1_proper
 SERVICE1_PROPERTY_51 = PropertyIdentifier(siid=1, piid=51, name="service1_property_51")
 SERVICE1_COMPLETION_FLAG_PROPERTY = PropertyIdentifier(siid=1, piid=52, name="service1_completion_flag")
 BLUETOOTH_PROPERTY = PropertyIdentifier(siid=1, piid=53, name="bluetooth_connected")
+SERVICE1_PROPERTY_54 = PropertyIdentifier(siid=1, piid=54, name="service1_property_54")
 
 STATUS_PROPERTY = PropertyIdentifier(siid=2, piid=1, name="status")
 DEVICE_CODE_PROPERTY = PropertyIdentifier(siid=2, piid=2, name="device_code")

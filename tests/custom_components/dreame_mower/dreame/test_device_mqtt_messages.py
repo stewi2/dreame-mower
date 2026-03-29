@@ -261,6 +261,25 @@ class TestDeviceMqttSilentlyAcknowledged:
                 },
                 "issue #52: 2:53 value 100 (mova.mower.g2405a fw 4.3.6_0450)"
             ),
+            (  # Issue #64: 1:54 device metadata payload on dreame.mower.g2541e
+                {
+                    "id": 128,
+                    "method": "properties_changed",
+                    "params": [{
+                        "did": "-1******21",
+                        "piid": 54,
+                        "siid": 1,
+                        "value": {
+                            "active_time": "2026-03-21 00:00:00",
+                            "did": "-1******21",
+                            "expire_time": "2029-03-21 00:00:00",
+                            "num": "89****************10",
+                            "sn": "G2**************32"
+                        }
+                    }]
+                },
+                "issue #64: 1:54 device metadata payload (dreame.mower.g2541e fw 4.3.6_0337)"
+            ),
         ],
     )
     def test_silently_acknowledged_mqtt_messages(self, device, mqtt_message, description):

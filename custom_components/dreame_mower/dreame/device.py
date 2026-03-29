@@ -58,6 +58,7 @@ from .const import (
     SERVICE1_PROPERTY_50,
     SERVICE1_PROPERTY_51,
     SERVICE1_COMPLETION_FLAG_PROPERTY,
+    SERVICE1_PROPERTY_54,
     STATUS_MAPPING,
     PROPERTY_FIRMWARE,
     CHARGING_STATUS_PROPERTY,
@@ -681,6 +682,11 @@ class DreameMowerDevice:
                 # Note: This property typically has no value field, just presence indicates completion
                 self._service1_completion_flag = True
                 self._notify_property_change(SERVICE1_COMPLETION_FLAG_PROPERTY.name, True)
+            elif SERVICE1_PROPERTY_54.matches(siid, piid):
+                # Handle Service 1 property 54 (1:54) - device metadata payload containing identifiers
+                # Observed fields include active_time, expire_time, num, and sn (issue #64).
+                # Silently acknowledge to suppress unhandled MQTT notifications.
+                _LOGGER.debug("Service 1 property 54 received: %s", message.get("value"))
             elif CHARGING_STATUS_PROPERTY.matches(siid, piid):
                 value = message["value"]
                 try:
