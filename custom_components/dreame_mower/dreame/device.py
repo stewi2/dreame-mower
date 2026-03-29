@@ -42,6 +42,7 @@ from .const import (
     SCHEDULING_SUMMARY_PROPERTY,
     MOWER_CONTROL_STATUS_PROPERTY,
     POWER_STATE_PROPERTY,
+    SERVICE2_PROPERTY_53,
     SERVICE2_PROPERTY_54,
     SERVICE2_PROPERTY_55,
     SERVICE2_PROPERTY_60,
@@ -751,6 +752,10 @@ class DreameMowerDevice:
                 # Observed values: -33101 (mova.mower.g2405a fw 4.3.6_0430), -33001 — meaning unknown.
                 # Silently acknowledge to suppress unhandled MQTT notifications.
                 _LOGGER.debug("Service 2 property 63 received: %s", message.get("value"))
+            elif SERVICE2_PROPERTY_53.matches(siid, piid):
+                # Handle Service 2 property 53 (2:53) - meaning unknown, only value seen so far is 100
+                # Silently acknowledge to suppress unhandled MQTT notifications (see issue #52)
+                _LOGGER.debug("Service 2 property 53 received: %s", message.get("value"))
             elif SERVICE2_PROPERTY_54.matches(siid, piid):
                 # Handle Service 2 property 54 (2:54) - meaning unknown, only value seen so far is 100
                 # Silently acknowledge to suppress unhandled MQTT notifications (see issue #25)
