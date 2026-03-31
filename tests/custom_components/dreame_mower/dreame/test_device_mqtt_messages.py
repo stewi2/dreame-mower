@@ -86,6 +86,15 @@ class TestDeviceMqttPropertyUpdate:
                 "service2_property_65",
                 lambda v: v == "dm::TASK_NAV_DIVIDE_REGION"
             ),
+            (  # Issue #68: 2:65 dm::TASK_NAV_CRUISE_POINT (mova.mower.g2529b fw 4.3.6_0169)
+                {
+                    "id": 201,
+                    "method": "properties_changed",
+                    "params": [{"did": "-1******36", "piid": 65, "siid": 2, "value": "dm::TASK_NAV_CRUISE_POINT"}]
+                },
+                "service2_property_65",
+                lambda v: v == "dm::TASK_NAV_CRUISE_POINT"
+            ),
             (  # Issue #51: 1:4 11-byte medium format (mova.mower.g2529d fw 4.3.6_0169)
                 {
                     "id": 244,
