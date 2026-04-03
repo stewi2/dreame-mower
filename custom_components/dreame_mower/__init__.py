@@ -25,6 +25,7 @@ _MOWER_PLATFORMS = (
     Platform.SENSOR,
     Platform.CAMERA,
     Platform.SELECT,
+    Platform.BUTTON,
 )
 _SWBOT_PLATFORMS = (
     Platform.SENSOR,
@@ -57,6 +58,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     
     # Trigger initial data update to reflect current device state
     await coordinator.async_request_refresh()
+
+    if coordinator.device_type != DEVICE_TYPE_SWBOT:
+        try:
+            await coordinator.async_fetch_consumable_data()
+        except Exception as ex:
+            _LOGGER.warning("Initial consumable data fetch failed: %s", ex)
     
     # Store coordinator in hass data
     hass.data.setdefault(DOMAIN, {})[entry.entry_id] = {

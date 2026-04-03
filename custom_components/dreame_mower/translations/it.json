@@ -110,11 +110,31 @@
       },
       "current_task": {
         "name": "Attività attuale"
+      },
+      "consumable_blade_health": {
+        "name": "Stato delle lame"
+      },
+      "consumable_brush_health": {
+        "name": "Stato della spazzola"
+      },
+      "consumable_robot_health": {
+        "name": "Stato di manutenzione"
       }
     },
     "camera": {
       "map_camera": {
         "name": "Mappa"
+      }
+    },
+    "button": {
+      "reset_blade": {
+        "name": "Azzera contatore lame"
+      },
+      "reset_brush": {
+        "name": "Azzera contatore spazzola"
+      },
+      "reset_robot_maintenance": {
+        "name": "Azzera contatore manutenzione"
       }
     }
   }

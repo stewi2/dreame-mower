@@ -110,11 +110,31 @@
       },
       "current_task": {
         "name": "Huidige taak"
+      },
+      "consumable_blade_health": {
+        "name": "Messenstaat"
+      },
+      "consumable_brush_health": {
+        "name": "Borststaat"
+      },
+      "consumable_robot_health": {
+        "name": "Onderhoudsstatus"
       }
     },
     "camera": {
       "map_camera": {
         "name": "Kaart"
+      }
+    },
+    "button": {
+      "reset_blade": {
+        "name": "Mestenteller resetten"
+      },
+      "reset_brush": {
+        "name": "Borstelenteller resetten"
+      },
+      "reset_robot_maintenance": {
+        "name": "Onderhoudsteller resetten"
       }
     }
   }

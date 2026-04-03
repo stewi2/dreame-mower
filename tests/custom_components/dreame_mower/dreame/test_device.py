@@ -713,6 +713,55 @@ def test_refresh_current_map_id_reads_active_map_from_mapl(device):
     assert device._cloud_device.action_calls[-1][2] == [{"m": "g", "t": "MAPL"}]
 
 
+@pytest.mark.asyncio
+async def test_get_consumable_status_sends_cms_getter_payload(device):
+    """CMS getter should send the CMS getter payload and parse d.value."""
+    device._cloud_device.set_connected_state(True)
+    await device.connect()
+    device._cloud_device.action_result = {
+        "code": 0,
+        "out": [{"r": 0, "d": {"value": [120, 600, 30]}}],
+    }
+
+    result = await device.get_consumable_status()
+
+    assert result["values"] == [120, 600, 30]
+    assert device._cloud_device.action_calls[-1][2] == [{"m": "g", "t": "CMS"}]
+
+
+def test_extract_consumable_values_accepts_direct_data_shape(device):
+    """CMS parsing should tolerate already-unwrapped action data."""
+    result = device._extract_consumable_values({"d": {"value": ["1", 2, 3]}})
+
+    assert result == [1, 2, 3]
+
+
+@pytest.mark.asyncio
+async def test_reset_consumable_counter_zeroes_selected_slot(device):
+    """Resetting one consumable should preserve the others and send the CMS setter."""
+    device._cloud_device.set_connected_state(True)
+    await device.connect()
+
+    responses = iter(
+        [
+            {"code": 0, "out": [{"r": 0, "d": {"value": [120, 600, 30]}}]},
+            {"code": 0, "out": [{"r": 0, "d": {"value": [0, 600, 30]}}]},
+        ]
+    )
+    device._cloud_device.action_result = lambda *_args, **_kwargs: next(responses)
+
+    result = await device.reset_consumable_counter("blade")
+
+    assert result["item"] == "blade"
+    assert result["previous_values"] == [120, 600, 30]
+    assert result["requested_values"] == [0, 600, 30]
+    assert result["updated_values"] == [0, 600, 30]
+    assert device._cloud_device.action_calls[0][2] == [{"m": "g", "t": "CMS"}]
+    assert device._cloud_device.action_calls[1][2] == [
+        {"m": "s", "t": "CMS", "d": {"value": [0, 600, 30]}}
+    ]
+
+
 def test_fetch_vector_map_updates_current_map_id_from_mapl(device):
     """Vector map refresh should also refresh current_map_id from MAPL."""
     device._cloud_device.batch_device_datas_result = {"MAP.info": "2"}

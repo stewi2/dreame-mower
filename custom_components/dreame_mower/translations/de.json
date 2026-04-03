@@ -110,11 +110,31 @@
       },
       "current_task": {
         "name": "Aktuelle Aufgabe"
+      },
+      "consumable_blade_health": {
+        "name": "Klingenverschleiß"
+      },
+      "consumable_brush_health": {
+        "name": "Bürstenverschleiß"
+      },
+      "consumable_robot_health": {
+        "name": "Wartungszustand"
       }
     },
     "camera": {
       "map_camera": {
         "name": "Karte"
+      }
+    },
+    "button": {
+      "reset_blade": {
+        "name": "Klingenzähler zurücksetzen"
+      },
+      "reset_brush": {
+        "name": "Bürstenzähler zurücksetzen"
+      },
+      "reset_robot_maintenance": {
+        "name": "Wartungszähler zurücksetzen"
       }
     }
   }

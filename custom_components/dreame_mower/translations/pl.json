@@ -110,11 +110,31 @@
       },
       "current_task": {
         "name": "Obecne zadanie"
+      },
+      "consumable_blade_health": {
+        "name": "Stan ostrzy"
+      },
+      "consumable_brush_health": {
+        "name": "Stan szczotki"
+      },
+      "consumable_robot_health": {
+        "name": "Stan konserwacji"
       }
     },
     "camera": {
       "map_camera": {
         "name": "Mapa"
+      }
+    },
+    "button": {
+      "reset_blade": {
+        "name": "Zresetuj licznik ostrzy"
+      },
+      "reset_brush": {
+        "name": "Zresetuj licznik szczotki"
+      },
+      "reset_robot_maintenance": {
+        "name": "Zresetuj licznik konserwacji"
       }
     }
   }

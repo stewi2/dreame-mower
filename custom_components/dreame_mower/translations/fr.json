@@ -110,11 +110,31 @@
       },
       "current_task": {
         "name": "Tâche actuelle"
+      },
+      "consumable_blade_health": {
+        "name": "État des lames"
+      },
+      "consumable_brush_health": {
+        "name": "État de la brosse"
+      },
+      "consumable_robot_health": {
+        "name": "État de maintenance"
       }
     },
     "camera": {
       "map_camera": {
         "name": "Carte"
+      }
+    },
+    "button": {
+      "reset_blade": {
+        "name": "Réinitialiser le compteur des lames"
+      },
+      "reset_brush": {
+        "name": "Réinitialiser le compteur de brosse"
+      },
+      "reset_robot_maintenance": {
+        "name": "Réinitialiser le compteur de maintenance"
       }
     }
   }

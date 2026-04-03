@@ -88,6 +88,22 @@ from .const import (
 
 _LOGGER = logging.getLogger(__name__)
 
+CONSUMABLE_COUNTER_TOTAL_MINUTES: dict[str, int] = {
+    "blade": 6000,
+    "brush": 30000,
+    "robot": 3600,
+}
+
+CONSUMABLE_COUNTER_INDEX: dict[str, int] = {
+    "blade": 0,
+    "blades": 0,
+    "brush": 1,
+    "cleaning_brush": 1,
+    "robot": 2,
+    "maintenance": 2,
+    "robot_maintenance": 2,
+}
+
 
 class MowingMode(str, Enum):
     """Mowing modes exposed by the mower task protocol."""
@@ -1099,6 +1115,93 @@ class DreameMowerDevice:
             "t": "MAPL",
         }
 
+    def _build_get_consumable_payload(self) -> dict[str, Any]:
+        """Build the getter payload for CMS consumable counters."""
+        return {
+            "m": "g",
+            "t": "CMS",
+        }
+
+    def _build_set_consumable_payload(self, values: Sequence[int]) -> dict[str, Any]:
+        """Build the setter payload for CMS consumable counters."""
+        normalized_values = [int(value) for value in values]
+        if len(normalized_values) != 3:
+            raise ValueError(f"CMS values must contain exactly 3 counters; got {normalized_values}")
+
+        if any(value < 0 for value in normalized_values):
+            raise ValueError(f"CMS values cannot be negative; got {normalized_values}")
+
+        return {
+            "m": "s",
+            "t": "CMS",
+            "d": {
+                "value": normalized_values,
+            },
+        }
+
+    @staticmethod
+    def _extract_custom_action_data(result: Any) -> dict[str, Any] | None:
+        """Extract the first successful data payload from a custom action result."""
+        if not isinstance(result, dict):
+            return None
+
+        if isinstance(result.get("value"), list):
+            return result
+
+        direct_data = result.get("d")
+        if isinstance(direct_data, dict):
+            return direct_data
+
+        out_entries = result.get("out")
+        if not isinstance(out_entries, list):
+            return None
+
+        for out_entry in out_entries:
+            if not isinstance(out_entry, dict):
+                continue
+
+            if out_entry.get("r") not in (None, 0) and out_entry.get("code") not in (None, 0):
+                continue
+
+            data = out_entry.get("d")
+            if isinstance(data, dict):
+                return data
+
+        return None
+
+    @classmethod
+    def _extract_consumable_values(cls, result: Any) -> list[int] | None:
+        """Extract the CMS counter list from a custom action result."""
+        data = cls._extract_custom_action_data(result)
+        if not isinstance(data, dict):
+            return None
+
+        values = data.get("value")
+        if not isinstance(values, list) or len(values) < 3:
+            return None
+
+        normalized_values: list[int] = []
+        for value in values[:3]:
+            try:
+                normalized_values.append(int(value))
+            except (TypeError, ValueError):
+                return None
+
+        return normalized_values
+
+    @staticmethod
+    def _normalize_consumable_item(item: str) -> str:
+        """Normalize a consumable alias to the canonical CMS item name."""
+        normalized_item = item.strip().lower()
+        if normalized_item not in CONSUMABLE_COUNTER_INDEX:
+            raise ValueError(f"Unknown consumable item: {item}")
+
+        if normalized_item in ("blade", "blades"):
+            return "blade"
+        if normalized_item in ("brush", "cleaning_brush"):
+            return "brush"
+        return "robot"
+
     def _current_map_id_from_map_list_result(self, result: Any) -> int | None:
         """Extract the active exposed map ID from a MAPL action response."""
         if not isinstance(result, dict):
@@ -1138,6 +1241,58 @@ class DreameMowerDevice:
                     return self._map_id_from_index(normalized_index, fallback_position=position)
 
         return None
+
+    async def get_consumable_status(self) -> dict[str, Any]:
+        """Fetch the raw CMS consumable counters and parsed values."""
+        result = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: self._cloud_device.action(
+                SCHEDULING_TASK_PROPERTY.siid,
+                SCHEDULING_TASK_PROPERTY.piid,
+                [self._build_get_consumable_payload()],
+            ),
+        )
+        return {
+            "raw_result": result,
+            "values": self._extract_consumable_values(result),
+        }
+
+    async def set_consumable_status(self, values: Sequence[int]) -> dict[str, Any]:
+        """Write CMS consumable counters and return the parsed response."""
+        payload = self._build_set_consumable_payload(values)
+        result = await asyncio.get_event_loop().run_in_executor(
+            None,
+            lambda: self._cloud_device.action(
+                SCHEDULING_TASK_PROPERTY.siid,
+                SCHEDULING_TASK_PROPERTY.piid,
+                [payload],
+            ),
+        )
+        return {
+            "raw_result": result,
+            "values": self._extract_consumable_values(result),
+        }
+
+    async def reset_consumable_counter(self, item: str) -> dict[str, Any]:
+        """Reset one CMS consumable counter to zero and return before/after state."""
+        normalized_item = self._normalize_consumable_item(item)
+        current_status = await self.get_consumable_status()
+        current_values = current_status["values"]
+        if current_values is None:
+            raise ValueError(f"Failed to parse CMS getter response: {current_status['raw_result']!r}")
+
+        next_values = list(current_values)
+        next_values[CONSUMABLE_COUNTER_INDEX[normalized_item]] = 0
+        updated_status = await self.set_consumable_status(next_values)
+
+        return {
+            "item": normalized_item,
+            "previous_values": current_values,
+            "requested_values": next_values,
+            "updated_values": updated_status["values"],
+            "raw_get_result": current_status["raw_result"],
+            "raw_set_result": updated_status["raw_result"],
+        }
 
     def refresh_current_map_id(self) -> bool:
         """Refresh the current map by querying the MAPL getter."""

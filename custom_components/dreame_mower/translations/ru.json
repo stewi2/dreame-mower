@@ -110,11 +110,31 @@
       },
       "current_task": {
         "name": "Текущая задача"
+      },
+      "consumable_blade_health": {
+        "name": "Состояние ножей"
+      },
+      "consumable_brush_health": {
+        "name": "Состояние щётки"
+      },
+      "consumable_robot_health": {
+        "name": "Состояние обслуживания"
       }
     },
     "camera": {
       "map_camera": {
         "name": "Карта"
+      }
+    },
+    "button": {
+      "reset_blade": {
+        "name": "Сбросить счётчик ножей"
+      },
+      "reset_brush": {
+        "name": "Сбросить счётчик щётки"
+      },
+      "reset_robot_maintenance": {
+        "name": "Сбросить счётчик обслуживания"
       }
     }
   }

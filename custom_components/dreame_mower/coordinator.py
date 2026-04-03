@@ -36,7 +36,7 @@ from .dreame.property import (
     NOTIFICATION_NAME_FIELD,
     NOTIFICATION_DESCRIPTION_FIELD,
 )
-from .dreame.const import POWER_STATE_PROPERTY
+from .dreame.const import POWER_STATE_PROPERTY, DeviceStatus, STATUS_PROPERTY
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -68,6 +68,7 @@ class DreameMowerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._selected_contour_id: tuple[int, int] | None = None
         self._selected_zone_id: int | None = None
         self._selected_spot_area_id: int | None = None
+        self._consumable_values: list[int] | None = None
         
         # Initialize issue reporter for unhandled MQTT messages
         self.issue_reporter = DreameMowerIssueReporter(hass)
@@ -393,6 +394,8 @@ class DreameMowerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     def _handle_device_update(self, property_name: str, value: Any) -> None:
         """Handle device property updates and notify Home Assistant."""
+        if property_name == STATUS_PROPERTY.name and int(value) == DeviceStatus.CHARGING:
+            self.hass.create_task(self._async_refresh_consumables_on_charging())
         self._normalize_selection_state()
 
         # Handle device code error notifications
@@ -476,6 +479,13 @@ class DreameMowerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         # Use async_set_updated_data to trigger entity updates
         self.hass.create_task(self._async_handle_device_update())
     
+    async def _async_refresh_consumables_on_charging(self) -> None:
+        """Fetch updated CMS counters when the device transitions to charging."""
+        try:
+            await self.async_fetch_consumable_data()
+        except Exception as ex:
+            _LOGGER.warning("Consumable refresh on charging failed: %s", ex)
+
     async def _async_handle_device_update(self) -> None:
         """Async handler for device updates."""
         try:
@@ -494,8 +504,19 @@ class DreameMowerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         """
         self.device.register_property_callback(callback)
 
+    @property
+    def consumable_values(self) -> list[int] | None:
+        """Return cached CMS consumable counters: [blade_min, brush_min, robot_min]."""
+        return self._consumable_values
+
+    async def async_fetch_consumable_data(self) -> None:
+        """Fetch CMS consumable counters from the device and cache them."""
+        result = await self.device.get_consumable_status()
+        self._consumable_values = result.get("values")
+        data = await self._async_update_data()
+        self.async_set_updated_data(data)
+
     async def async_connect_device(self) -> bool:
-        """Connect to the device."""
         return await self.device.connect()
 
     async def async_disconnect_device(self) -> None:

@@ -111,6 +111,26 @@
       },
       "current_task": {
         "name": "Current task"
+      },
+      "consumable_blade_health": {
+        "name": "Blade Health"
+      },
+      "consumable_brush_health": {
+        "name": "Brush Health"
+      },
+      "consumable_robot_health": {
+        "name": "Robot Maintenance Health"
+      }
+    },
+    "button": {
+      "reset_blade": {
+        "name": "Reset Blade Counter"
+      },
+      "reset_brush": {
+        "name": "Reset Brush Counter"
+      },
+      "reset_robot_maintenance": {
+        "name": "Reset Robot Maintenance Counter"
       }
     },
     "camera": {

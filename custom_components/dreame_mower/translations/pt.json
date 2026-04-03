@@ -110,11 +110,31 @@
       },
       "current_task": {
         "name": "Tarefa atual"
+      },
+      "consumable_blade_health": {
+        "name": "Estado das lâminas"
+      },
+      "consumable_brush_health": {
+        "name": "Estado da escova"
+      },
+      "consumable_robot_health": {
+        "name": "Estado de manutenção"
       }
     },
     "camera": {
       "map_camera": {
         "name": "Mapa"
+      }
+    },
+    "button": {
+      "reset_blade": {
+        "name": "Repor contador de lâminas"
+      },
+      "reset_brush": {
+        "name": "Repor contador de escova"
+      },
+      "reset_robot_maintenance": {
+        "name": "Repor contador de manutenção"
       }
     }
   }

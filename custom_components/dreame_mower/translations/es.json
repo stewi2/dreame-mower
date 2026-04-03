@@ -110,11 +110,31 @@
       },
       "current_task": {
         "name": "Tarea actual"
+      },
+      "consumable_blade_health": {
+        "name": "Estado de cuchillas"
+      },
+      "consumable_brush_health": {
+        "name": "Estado del cepillo"
+      },
+      "consumable_robot_health": {
+        "name": "Estado de mantenimiento"
       }
     },
     "camera": {
       "map_camera": {
         "name": "Mapa"
+      }
+    },
+    "button": {
+      "reset_blade": {
+        "name": "Restablecer contador de cuchillas"
+      },
+      "reset_brush": {
+        "name": "Restablecer contador de cepillo"
+      },
+      "reset_robot_maintenance": {
+        "name": "Restablecer contador de mantenimiento"
       }
     }
   }

@@ -110,11 +110,31 @@
       },
       "current_task": {
         "name": "Aktuell uppgift"
+      },
+      "consumable_blade_health": {
+        "name": "Knivskick"
+      },
+      "consumable_brush_health": {
+        "name": "Borststatus"
+      },
+      "consumable_robot_health": {
+        "name": "Underhållsstatus"
       }
     },
     "camera": {
       "map_camera": {
         "name": "Karta"
+      }
+    },
+    "button": {
+      "reset_blade": {
+        "name": "Återställ knivräknaren"
+      },
+      "reset_brush": {
+        "name": "Återställ borstenteller"
+      },
+      "reset_robot_maintenance": {
+        "name": "Återställ underhållsräknaren"
       }
     }
   }

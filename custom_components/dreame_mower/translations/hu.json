@@ -110,11 +110,31 @@
       },
       "current_task": {
         "name": "Aktuális feladat"
+      },
+      "consumable_blade_health": {
+        "name": "Penge állapota"
+      },
+      "consumable_brush_health": {
+        "name": "Kefe állapota"
+      },
+      "consumable_robot_health": {
+        "name": "Karbantartási állapot"
       }
     },
     "camera": {
       "map_camera": {
         "name": "Térkép"
+      }
+    },
+    "button": {
+      "reset_blade": {
+        "name": "Pengeszámláló visszaállítása"
+      },
+      "reset_brush": {
+        "name": "Kefeszámláló visszaállítása"
+      },
+      "reset_robot_maintenance": {
+        "name": "Karbantartási számláló visszaállítása"
       }
     }
   }

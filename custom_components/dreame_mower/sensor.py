@@ -43,6 +43,9 @@ async def async_setup_entry(
             DreameMowerDeviceCodeSensor(coordinator),
             DreameMowerTaskSensor(coordinator),
             DreameMowerProgressSensor(coordinator),
+            DreameMowerConsumableHealthSensor(coordinator, "blade", 0, 6000, "mdi:scissors-cutting"),
+            DreameMowerConsumableHealthSensor(coordinator, "brush", 1, 30000, "mdi:brush"),
+            DreameMowerConsumableHealthSensor(coordinator, "robot", 2, 3600, "mdi:robot"),
         ]
     
     async_add_entities(sensors)
@@ -267,3 +270,53 @@ class DreameMowerProgressSensor(DreameMowerEntity, SensorEntity):
         attributes["path_points"] = len(path_history)
         
         return attributes
+
+
+_CONSUMABLE_ITEM_INDEX = {"blade": 0, "brush": 1, "robot": 2}
+
+
+class DreameMowerConsumableHealthSensor(DreameMowerEntity, SensorEntity):
+    """Remaining-life health sensor for one CMS consumable item."""
+
+    def __init__(
+        self,
+        coordinator: DreameMowerCoordinator,
+        item: str,
+        index: int,
+        total_minutes: int,
+        icon: str,
+    ) -> None:
+        super().__init__(coordinator, f"consumable_{item}_health")
+        self._item = item
+        self._index = index
+        self._total_minutes = total_minutes
+        self._attr_state_class = SensorStateClass.MEASUREMENT
+        self._attr_native_unit_of_measurement = PERCENTAGE
+        self._attr_icon = icon
+        self._attr_translation_key = f"consumable_{item}_health"
+
+    def _used_minutes(self) -> int | None:
+        values = self.coordinator.consumable_values
+        if values is None or len(values) <= self._index:
+            return None
+        return max(0, min(int(values[self._index]), self._total_minutes))
+
+    @property
+    def native_value(self) -> float | None:
+        used = self._used_minutes()
+        if used is None:
+            return None
+        remaining = self._total_minutes - used
+        return round((remaining / self._total_minutes) * 100, 1)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        used = self._used_minutes()
+        if used is None:
+            return {}
+        remaining = self._total_minutes - used
+        return {
+            "used_hours": round(used / 60, 1),
+            "remaining_hours": round(remaining / 60, 1),
+            "total_hours": round(self._total_minutes / 60, 1),
+        }

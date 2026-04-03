@@ -110,11 +110,31 @@
       },
       "current_task": {
         "name": "Поточне завдання"
+      },
+      "consumable_blade_health": {
+        "name": "Стан ножів"
+      },
+      "consumable_brush_health": {
+        "name": "Стан щітки"
+      },
+      "consumable_robot_health": {
+        "name": "Стан обслуговування"
       }
     },
     "camera": {
       "map_camera": {
         "name": "Карта"
+      }
+    },
+    "button": {
+      "reset_blade": {
+        "name": "Скинути лічильник ножів"
+      },
+      "reset_brush": {
+        "name": "Скинути лічильник щітки"
+      },
+      "reset_robot_maintenance": {
+        "name": "Скинути лічильник обслуговування"
       }
     }
   }
