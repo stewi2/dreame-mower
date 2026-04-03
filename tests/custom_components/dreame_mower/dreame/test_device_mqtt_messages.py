@@ -289,6 +289,20 @@ class TestDeviceMqttSilentlyAcknowledged:
                 },
                 "issue #64: 1:54 device metadata payload (dreame.mower.g2541e fw 4.3.6_0337)"
             ),
+            (  # Issue #78: 6:3 [bool, int] array on dreame.mower.g2541e
+                {
+                    "id": 107,
+                    "method": "properties_changed",
+                    "params": [{
+                        "did": "-1******82",
+                        "piid": 3,
+                        "realTime": "2026-04-02 00:29:29.547574",
+                        "siid": 6,
+                        "value": [False, -128]
+                    }]
+                },
+                "issue #78: 6:3 value [False, -128] (dreame.mower.g2541e fw 4.3.6_0407)"
+            ),
         ],
     )
     def test_silently_acknowledged_mqtt_messages(self, device, mqtt_message, description):

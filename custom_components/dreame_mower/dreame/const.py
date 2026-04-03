@@ -82,6 +82,8 @@ SERVICE5_PROPERTY_106 = PropertyIdentifier(siid=5, piid=106, name="service5_prop
 SERVICE5_ENERGY_INDEX_PROPERTY = PropertyIdentifier(siid=5, piid=107, name="service5_energy_index")
 SERVICE5_PROPERTY_108 = PropertyIdentifier(siid=5, piid=108, name="service5_property_108")
 
+SERVICE6_PROPERTY_3 = PropertyIdentifier(siid=6, piid=3, name="service6_property_3")
+
 # Properties 99:10 and 99:20 provide file paths for downloadable files from the cloud, including:
 # - Firmware/OTA update packages (when firmware updates are available)
 # - Device log files (when user selects "Report logs" in the app)
