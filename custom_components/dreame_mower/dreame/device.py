@@ -71,6 +71,7 @@ from .const import (
     SERVICE5_PROPERTY_106,
     SERVICE5_ENERGY_INDEX_PROPERTY,
     SERVICE5_PROPERTY_108,
+    SERVICE6_PROPERTY_1,
     SERVICE6_PROPERTY_3,
     DEVICE_FILE_PATH_PROPERTY,
     DEVICE_FILE_PATH_PROPERTY_20,
@@ -828,6 +829,11 @@ class DreameMowerDevice:
                 # Handle Service 2 property 67 (2:67) - 4-integer array, observed after MOWING_COMPLETED
                 # Meaning unknown; silently acknowledge to suppress unhandled MQTT notifications (issues #34, #35, #36, #38)
                 _LOGGER.debug("Service 2 property 67 received: %s", message.get("value"))
+            elif SERVICE6_PROPERTY_1.matches(siid, piid):
+                # Handle Service 6 property 1 (6:1) - integer value.
+                # Observed on dreame.mower.g2541e fw 4.3.6_0407 with value 200 (issue #71).
+                # Meaning is still unknown; silently acknowledge to suppress repeated issue noise.
+                _LOGGER.debug("Service 6 property 1 received: %s", message.get("value"))
             elif SERVICE6_PROPERTY_3.matches(siid, piid):
                 # Handle Service 6 property 3 (6:3) - 2-item [bool, int] array.
                 # Observed on dreame.mower.g2541e fw 4.3.6_0407 with value [False, -128] (issue #78).

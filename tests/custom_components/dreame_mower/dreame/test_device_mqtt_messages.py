@@ -303,6 +303,20 @@ class TestDeviceMqttSilentlyAcknowledged:
                 },
                 "issue #78: 6:3 value [False, -128] (dreame.mower.g2541e fw 4.3.6_0407)"
             ),
+            (  # Issue #71: 6:1 integer on dreame.mower.g2541e
+                {
+                    "id": 1002,
+                    "method": "properties_changed",
+                    "params": [{
+                        "did": "-1******82",
+                        "piid": 1,
+                        "realTime": "2026-04-01 15:25:25.264213",
+                        "siid": 6,
+                        "value": 200
+                    }]
+                },
+                "issue #71: 6:1 value 200 (dreame.mower.g2541e fw 4.3.6_0407)"
+            ),
         ],
     )
     def test_silently_acknowledged_mqtt_messages(self, device, mqtt_message, description):
