@@ -67,13 +67,11 @@ def _device_type_for_model(model: str) -> str:
 NOTIFICATION_INFORMATION = "information"
 NOTIFICATION_WARNING = "warning"
 NOTIFICATION_ERROR = "error"
-NOTIFICATION_MQTT_DISCOVERY = "mqtt_discovery"
 
 NOTIFICATION = {
     NOTIFICATION_INFORMATION: "Information",
     NOTIFICATION_WARNING: "Warning", 
     NOTIFICATION_ERROR: "Error",
-    NOTIFICATION_MQTT_DISCOVERY: "MQTT Message Discovery (for developers)",
 }
 
 

@@ -24,10 +24,8 @@ from .config_flow import (
     NOTIFICATION_INFORMATION,
     NOTIFICATION_WARNING,
     NOTIFICATION_ERROR,
-    NOTIFICATION_MQTT_DISCOVERY,
 )
 from .dreame.device import DreameMowerDevice, DreameSwbotDevice, MowingMode
-from .dreame.issue_reporter import DreameMowerIssueReporter
 from .dreame.property import (
     DEVICE_CODE_ERROR_PROPERTY_NAME,
     DEVICE_CODE_WARNING_PROPERTY_NAME,
@@ -69,9 +67,6 @@ class DreameMowerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._selected_zone_id: int | None = None
         self._selected_spot_area_id: int | None = None
         self._consumable_values: list[int] | None = None
-        
-        # Initialize issue reporter for unhandled MQTT messages
-        self.issue_reporter = DreameMowerIssueReporter(hass)
 
         # Initialize coordinator with no automatic polling (device will push updates)
         super().__init__(
@@ -399,86 +394,60 @@ class DreameMowerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._normalize_selection_state()
 
         # Handle device code error notifications
+        notify_options = self.entry.options.get(CONF_NOTIFY, [])
         if property_name == DEVICE_CODE_ERROR_PROPERTY_NAME and isinstance(value, dict):
-            # Create persistent notification for error device codes
-            notify_options = self.entry.options.get(CONF_NOTIFY, [])
             if NOTIFICATION_ERROR in notify_options:
-                self.hass.create_task(
-                    self.issue_reporter.create_device_error_notification(
-                        value[NOTIFICATION_CODE_FIELD],
-                        value[NOTIFICATION_NAME_FIELD], 
-                        value[NOTIFICATION_DESCRIPTION_FIELD],
-                        self.device_model,
-                        self.device_firmware
-                    )
-                )
-        
-        # Handle device code warning notifications
-        elif property_name == DEVICE_CODE_WARNING_PROPERTY_NAME and isinstance(value, dict):
-            # Create persistent notification for warning device codes (optional - can be disabled)
-            notify_options = self.entry.options.get(CONF_NOTIFY, [])
-            if NOTIFICATION_WARNING in notify_options:
-                self.hass.create_task(
-                    self.issue_reporter.create_device_error_notification(
-                        value[NOTIFICATION_CODE_FIELD],
-                        value[NOTIFICATION_NAME_FIELD],
-                        value[NOTIFICATION_DESCRIPTION_FIELD], 
-                        self.device_model,
-                        self.device_firmware
-                    )
-                )
-        
-        # Handle device code info notifications
-        elif property_name == DEVICE_CODE_INFO_PROPERTY_NAME and isinstance(value, dict):
-            # Create persistent notification for info device codes (optional - can be disabled)
-            notify_options = self.entry.options.get(CONF_NOTIFY, [])
-            if NOTIFICATION_INFORMATION in notify_options:
-                self.hass.create_task(
-                    self.issue_reporter.create_device_info_notification(
-                        value[NOTIFICATION_CODE_FIELD],
-                        value[NOTIFICATION_NAME_FIELD],
-                        value[NOTIFICATION_DESCRIPTION_FIELD], 
-                        self.device_model,
-                        self.device_firmware
-                    )
-                )
+                code = value[NOTIFICATION_CODE_FIELD]
+                name = value[NOTIFICATION_NAME_FIELD]
+                desc = value[NOTIFICATION_DESCRIPTION_FIELD]
+                self.hass.create_task(self._notify(
+                    f"dreame_mower_device_error_{code}",
+                    f"\U0001f6a8 {self.device_model} Error: {name}",
+                    f"**Error Code:** {code}\n\n**Description:** {desc}\n\n**Device:** {self.device_model} (Firmware: {self.device_firmware})\n\nPlease check your mower and address any issues indicated by this error code.",
+                ))
 
-        # Handle POWER_STATE_PROPERTY notifications
-        elif property_name == POWER_STATE_PROPERTY.name:
-            if value == 1:  # Only notify for powered off state
-                notify_options = self.entry.options.get(CONF_NOTIFY, [])
-                if NOTIFICATION_INFORMATION in notify_options:
-                    self.hass.create_task(
-                        self.issue_reporter.create_device_info_notification(
-                            value,  # Use power state value as notification code
-                            "Mower Powered Off",
-                            "The mower has been powered off", 
-                            self.device_model,
-                            self.device_firmware
-                        )
-                    )
-        
-        # Handle special case for unhandled MQTT messages (both properties and other message types)
-        elif property_name == "unhandled_mqtt" and isinstance(value, dict):
-            # Check if user has enabled MQTT discovery notifications
-            notify_options = self.entry.options.get(CONF_NOTIFY, [])
-            if NOTIFICATION_MQTT_DISCOVERY in notify_options:
-                # Create persistent notification using issue reporter
-                self.hass.create_task(
-                    self.issue_reporter.create_unhandled_mqtt_notification(
-                        value, 
-                        self.device_model, 
-                        self.device_firmware
-                    )
-                )
-            else:
-                _LOGGER.debug("MQTT discovery notification skipped - user preference disabled")
+        elif property_name == DEVICE_CODE_WARNING_PROPERTY_NAME and isinstance(value, dict):
+            if NOTIFICATION_WARNING in notify_options:
+                code = value[NOTIFICATION_CODE_FIELD]
+                name = value[NOTIFICATION_NAME_FIELD]
+                desc = value[NOTIFICATION_DESCRIPTION_FIELD]
+                self.hass.create_task(self._notify(
+                    f"dreame_mower_device_error_{code}",
+                    f"\U0001f6a8 {self.device_model} Error: {name}",
+                    f"**Error Code:** {code}\n\n**Description:** {desc}\n\n**Device:** {self.device_model} (Firmware: {self.device_firmware})\n\nPlease check your mower and address any issues indicated by this error code.",
+                ))
+
+        elif property_name == DEVICE_CODE_INFO_PROPERTY_NAME and isinstance(value, dict):
+            if NOTIFICATION_INFORMATION in notify_options:
+                code = value[NOTIFICATION_CODE_FIELD]
+                name = value[NOTIFICATION_NAME_FIELD]
+                desc = value[NOTIFICATION_DESCRIPTION_FIELD]
+                self.hass.create_task(self._notify(
+                    f"dreame_mower_device_info_{code}",
+                    f"\u2139\ufe0f {self.device_model} Status: {name}",
+                    f"**Status Code:** {code}\n\n**Description:** {desc}\n\n**Device:** {self.device_model} (Firmware: {self.device_firmware})",
+                ))
+
+        elif property_name == POWER_STATE_PROPERTY.name and value == 1:
+            if NOTIFICATION_INFORMATION in notify_options:
+                self.hass.create_task(self._notify(
+                    "dreame_mower_device_info_power_off",
+                    f"\u2139\ufe0f {self.device_model} Status: Mower Powered Off",
+                    f"**Description:** The mower has been powered off\n\n**Device:** {self.device_model} (Firmware: {self.device_firmware})",
+                ))
         
         
         # Schedule a coordinator update to notify all entities
         # Use async_set_updated_data to trigger entity updates
         self.hass.create_task(self._async_handle_device_update())
     
+    async def _notify(self, notification_id: str, title: str, message: str) -> None:
+        """Create a persistent notification in Home Assistant."""
+        await self.hass.services.async_call(
+            "persistent_notification", "create",
+            {"notification_id": notification_id, "title": title, "message": message},
+        )
+
     async def _async_refresh_consumables_on_charging(self) -> None:
         """Fetch updated CMS counters when the device transitions to charging."""
         try:
