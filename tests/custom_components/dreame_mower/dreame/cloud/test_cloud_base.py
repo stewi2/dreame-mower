@@ -118,26 +118,30 @@ class TestDreameMowerCloudBase:
         assert cloud_base._secondary_key == "test_refresh"
         assert cloud_base._uuid == "test_uid"
 
-    def test_connect_failure_bad_credentials(self, cloud_base):
+    @patch('custom_components.dreame_mower.dreame.cloud.cloud_base.requests.session')
+    def test_connect_failure_bad_credentials(self, mock_session_class, cloud_base):
         """Test failed connection with bad credentials."""
-        cloud_base._session = Mock()
+        mock_session = Mock()
+        mock_session_class.return_value = mock_session
         mock_response = Mock()
         mock_response.status_code = 401
         mock_response.text = '{"error": "invalid credentials"}'
-        cloud_base._session.post.return_value = mock_response
-        
+        mock_session.post.return_value = mock_response
+
         result = cloud_base.connect()
-        
+
         assert result is False
         assert cloud_base.connected is False
 
-    def test_connect_timeout(self, cloud_base):
+    @patch('custom_components.dreame_mower.dreame.cloud.cloud_base.requests.session')
+    def test_connect_timeout(self, mock_session_class, cloud_base):
         """Test connection with timeout."""
-        cloud_base._session = Mock()
-        cloud_base._session.post.side_effect = requests.exceptions.Timeout()
-        
+        mock_session = Mock()
+        mock_session_class.return_value = mock_session
+        mock_session.post.side_effect = requests.exceptions.Timeout()
+
         result = cloud_base.connect()
-        
+
         assert result is False
         assert cloud_base.connected is False
 

@@ -420,18 +420,20 @@ class TestDreameMowerCloudDevice:
     def test_get_device_info_not_logged_in(self, protocol):
         """Test get_device_info (public API) returns None when unable to connect after attempting connection."""
         protocol._device_id = "123"
-        
-        # Mock the cloud base connected property to return False (simulating connection failure)
-        with patch('custom_components.dreame_mower.dreame.cloud.cloud_base.DreameMowerCloudBase.connected', new_callable=PropertyMock, return_value=False):
+
+        # Patch both connected and connect() to avoid real socket calls
+        with patch('custom_components.dreame_mower.dreame.cloud.cloud_base.DreameMowerCloudBase.connected', new_callable=PropertyMock, return_value=False), \
+             patch.object(protocol._cloud_base, 'connect', return_value=False):
             result = protocol.get_device_info()
             assert result is None
 
     def test_initialize_mqtt_connection_state_not_logged_in(self, protocol):
         """Test _initialize_mqtt_connection_state returns False when unable to connect after attempting connection."""
         protocol._device_id = "123"
-        
-        # Mock the cloud base connected property to return False (simulating connection failure)
-        with patch('custom_components.dreame_mower.dreame.cloud.cloud_base.DreameMowerCloudBase.connected', new_callable=PropertyMock, return_value=False):
+
+        # Patch both connected and connect() to avoid real socket calls
+        with patch('custom_components.dreame_mower.dreame.cloud.cloud_base.DreameMowerCloudBase.connected', new_callable=PropertyMock, return_value=False), \
+             patch.object(protocol._cloud_base, 'connect', return_value=False):
             assert protocol._initialize_mqtt_connection_state() is False
 
     # send_async removed in current implementation; covered in legacy tests
