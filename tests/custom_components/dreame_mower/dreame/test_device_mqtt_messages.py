@@ -307,6 +307,20 @@ class TestDeviceMqttSilentlyAcknowledged:
                 },
                 "issue #64: 1:54 device metadata payload (dreame.mower.g2541e fw 4.3.6_0337)"
             ),
+            (  # Issue #82: 1:55 integer value on dreame.mower.g2541e
+                {
+                    "id": 1189,
+                    "method": "properties_changed",
+                    "params": [{
+                        "did": "-1******82",
+                        "piid": 55,
+                        "realTime": "2026-04-05 14:39:24.648403",
+                        "siid": 1,
+                        "value": 1
+                    }]
+                },
+                "issue #82: 1:55 value 1 (dreame.mower.g2541e fw 4.3.6_0407)"
+            ),
             (  # Issue #78: 6:3 [bool, int] array on dreame.mower.g2541e
                 {
                     "id": 107,

@@ -59,6 +59,7 @@ from .const import (
     SERVICE1_PROPERTY_51,
     SERVICE1_COMPLETION_FLAG_PROPERTY,
     SERVICE1_PROPERTY_54,
+    SERVICE1_PROPERTY_55,
     STATUS_MAPPING,
     PROPERTY_FIRMWARE,
     CHARGING_STATUS_PROPERTY,
@@ -729,6 +730,11 @@ class DreameMowerDevice:
                 # Observed fields include active_time, expire_time, num, and sn (issue #64).
                 # Silently acknowledge to suppress unhandled MQTT notifications.
                 _LOGGER.debug("Service 1 property 54 received: %s", message.get("value"))
+            elif SERVICE1_PROPERTY_55.matches(siid, piid):
+                # Handle Service 1 property 55 (1:55) - integer value.
+                # Observed on dreame.mower.g2541e fw 4.3.6_0407 with value 1 (issue #82).
+                # Meaning unknown; silently acknowledge to suppress unhandled MQTT notifications.
+                _LOGGER.debug("Service 1 property 55 received: %s", message.get("value"))
             elif CHARGING_STATUS_PROPERTY.matches(siid, piid):
                 value = message["value"]
                 try:
