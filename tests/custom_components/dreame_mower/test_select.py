@@ -153,7 +153,7 @@ async def test_mowing_action_select_updates_coordinator_mode():
 def test_edge_select_options_and_current_option():
     entity = _make_edge_select()
 
-    assert entity.options == ["Edge (1, 0)", "Edge (2, 0)"]
+    assert entity.options == ["Front Lawn edge", "Edge (2, 0)"]
     assert entity.current_option == "Edge (2, 0)"
 
 
@@ -161,7 +161,7 @@ def test_edge_select_defaults_to_first_available_option_when_unset():
     coordinator = _make_real_selection_coordinator()
     entity = _make_edge_select(coordinator)
 
-    assert entity.current_option == "Edge (1, 0)"
+    assert entity.current_option == "Front Lawn edge"
 
 
 @pytest.mark.asyncio
@@ -169,7 +169,7 @@ async def test_edge_select_updates_selected_contour_id():
     coordinator = _make_coordinator()
     entity = _make_edge_select(coordinator)
 
-    await entity.async_select_option("Edge (1, 0)")
+    await entity.async_select_option("Front Lawn edge")
 
     coordinator.async_set_selected_contour_id.assert_awaited_once_with([1, 0])
 

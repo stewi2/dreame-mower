@@ -155,6 +155,11 @@ class DreameMowerEdgeSelect(DreameMowerEntity, SelectEntity):
 
     def _option_label(self, contour: list[int]) -> str:
         """Return the label shown for an edge-contour option."""
+        zone_id = contour[0]
+        for zone in self.coordinator.zones:
+            if int(zone["id"]) == zone_id:
+                name = zone.get("name") or f"Zone {zone_id}"
+                return f"{name} edge"
         return f"Edge ({contour[0]}, {contour[1]})"
 
     def _id_from_option(self, option: str) -> list[int] | None:
