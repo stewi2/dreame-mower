@@ -238,7 +238,8 @@ def _scale_map_data(data: Dict[str, Any], factor: int = 10) -> Dict[str, Any]:
     """
     def scale_points(points: list) -> list:
         return [
-            [p[0] * factor, p[1] * factor] if isinstance(p, list) and len(p) >= 2 else p
+            p if not isinstance(p, list) or len(p) < 2 or (p[0] == 2147483647 and p[1] == 2147483647)
+            else [p[0] * factor, p[1] * factor]
             for p in points
         ]
 
