@@ -104,6 +104,15 @@ class TestDeviceMqttPropertyUpdate:
                 "service2_property_65",
                 lambda v: v == "dm::TASK_SLAM_RELOCATE_OFFDOCK"
             ),
+            (  # Issue #81: 2:65 TASK_NAV_CHECK without dm:: prefix (dreame.mower.g2541e fw 4.3.6_0407)
+                {
+                    "id": 651,
+                    "method": "properties_changed",
+                    "params": [{"did": "-1******99", "piid": 65, "siid": 2, "value": "TASK_NAV_CHECK"}]
+                },
+                "service2_property_65",
+                lambda v: v == "TASK_NAV_CHECK"
+            ),
             (  # Issue #51: 1:4 11-byte medium format (mova.mower.g2529d fw 4.3.6_0169)
                 {
                     "id": 244,
