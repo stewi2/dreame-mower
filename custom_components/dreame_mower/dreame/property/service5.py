@@ -1,7 +1,7 @@
 """Service 5 property handling for Dreame Mower Implementation.
 
 This module provides parsing and handling for Service 5 properties:
-- 5:100 - Unknown property (discovered in issue #44)
+- 5:100 - Unknown property (discovered in issue #44, string variant in issue #90)
 - 5:101 - Unknown property, observed value: "success" (issue #56)
 - 5:104 - Task status (task completion status codes)
 - 5:105 - Unknown property (possible capability/feature flag)
@@ -268,10 +268,14 @@ class Service5PropertyHandler:
             return False
 
     def _handle_property_100(self, value: Any, notify_callback) -> bool:
-        """Handle Service 5 property 100 (discovered in issue #44)."""
+        """Handle Service 5 property 100 (discovered in issue #44).
+        
+        Value may be an integer or a string like "6 time_diff=-0.995" (issue #90).
+        In string form, the integer prefix is the meaningful value.
+        """
         try:
             old_value = self._property_100_value
-            self._property_100_value = int(value)
+            self._property_100_value = int(str(value).split()[0])
             notify_callback(SERVICE5_PROPERTY_100_PROPERTY_NAME, {PROPERTY_100_VALUE_FIELD: self._property_100_value})
             if old_value != self._property_100_value:
                 notify_callback("service5_property_100_value", self._property_100_value)

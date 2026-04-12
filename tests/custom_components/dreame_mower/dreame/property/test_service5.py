@@ -291,3 +291,38 @@ class TestService5PropertyHandler:
         self.handler.handle_property_update(5, 107, 100, self.notify_callback)
         
         assert self.handler.has_energy_tracking is True
+
+
+class TestProperty100:
+    """Tests for Service 5 property 100."""
+
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.handler = Service5PropertyHandler()
+        self.notifications = []
+
+        def mock_notify(property_name, value):
+            self.notifications.append((property_name, value))
+
+        self.notify_callback = mock_notify
+
+    def test_integer_value(self):
+        """Test handling integer value (issue #44)."""
+        result = self.handler.handle_property_update(5, 100, 5, self.notify_callback)
+
+        assert result is True
+        assert self.handler.property_100_value == 5
+
+    def test_string_value_with_time_diff(self):
+        """Test handling string value with time_diff suffix (issue #90)."""
+        result = self.handler.handle_property_update(5, 100, "6 time_diff=-0.995", self.notify_callback)
+
+        assert result is True
+        assert self.handler.property_100_value == 6
+
+    def test_string_value_extracts_integer_prefix(self):
+        """Test that the integer prefix is extracted from string values."""
+        result = self.handler.handle_property_update(5, 100, "42 extra_info=abc", self.notify_callback)
+
+        assert result is True
+        assert self.handler.property_100_value == 42

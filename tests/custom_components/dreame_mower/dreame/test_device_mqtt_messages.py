@@ -140,6 +140,15 @@ class TestDeviceMqttPropertyUpdate:
                 "service5_property_100",
                 lambda v: v["value_100"] == 5
             ),
+            (  # Issue #90: 5:100 string value with time_diff suffix (mova.mower.g2529d fw 4.3.6_0231)
+                {
+                    "id": 299,
+                    "method": "properties_changed",
+                    "params": [{"did": "-1******76", "piid": 100, "siid": 5, "value": "6 time_diff=-0.995"}]
+                },
+                "service5_property_100",
+                lambda v: v["value_100"] == 6
+            ),
             (  # Issue #42: 2:56 multi-zone status array with inactive (-1) entries (mova.mower.g2529b fw 4.3.6_0169)
                 {
                     "id": 325,
