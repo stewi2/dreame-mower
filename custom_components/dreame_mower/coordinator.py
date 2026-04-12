@@ -233,13 +233,13 @@ class DreameMowerCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         return self.device.current_segment
 
     @property
-    def mower_heading(self) -> int | None:
-        """Return current mower heading/state value."""
+    def mower_heading(self) -> float | None:
+        """Return current mower heading in degrees."""
         return self.device.mower_heading
 
     @property
-    def mowing_path_history(self) -> list[dict[str, Any]]:
-        """Return path history for visualization."""
+    def mowing_path_history(self) -> list[list[int]]:
+        """Return path history for visualization (list of [x, y] in map units)."""
         return self.device.mowing_path_history
 
     @property

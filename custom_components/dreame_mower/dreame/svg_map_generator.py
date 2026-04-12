@@ -51,37 +51,6 @@ ZONE_COLORS = [
 ]
 ZONE_LABEL_COLOR = '#3c3c3c'
 
-# Pose coverage coordinates are in decimeters (like M_PATH data) while
-# vector map zone coordinates are in centimeters.  X needs *10, Y is also
-# encoded with a *16 hardware factor so needs /16 * 10.
-_LIVE_X_SCALE = 10        # decimeters → centimeters
-_LIVE_Y_SCALE = 10 / 16   # decimeters*16 → centimeters (≈0.625)
-
-# If a scaled coordinate still falls outside map bounds, the int16 source
-# may have overflowed.  We correct by subtracting the int16 wrap (65536)
-# from the raw value and re-scaling.
-_INT16_WRAP = 65536
-
-
-def _scale_live_x(x_raw: int, map_min_x: int, map_max_x: int) -> int:
-    """Scale a live X coordinate from decimeters to centimeters."""
-    scaled = int(x_raw * _LIVE_X_SCALE)
-    if scaled > map_max_x + 2000:
-        corrected = int((x_raw - _INT16_WRAP) * _LIVE_X_SCALE)
-        if map_min_x - 2000 <= corrected <= map_max_x + 2000:
-            return corrected
-    return scaled
-
-
-def _scale_live_y(y_raw: int, map_min_y: int, map_max_y: int) -> int:
-    """Scale a live Y coordinate from decimeters*16 to centimeters."""
-    scaled = int(y_raw * _LIVE_Y_SCALE)
-    if scaled > map_max_y + 2000:
-        corrected = int((y_raw - _INT16_WRAP) * _LIVE_Y_SCALE)
-        if map_min_y - 2000 <= corrected <= map_max_y + 2000:
-            return corrected
-    return scaled
-
 
 def calculate_bounds(all_points: List[List[int]]) -> Tuple[int, int, int, int]:
     """Calculate the bounding box for all coordinate points.
@@ -262,7 +231,7 @@ def finish_svg_document(svg_lines: List[str]) -> str:
 
 
 def generate_svg_map_image(data: Dict[str, Any], historical_file_path: str | None, coordinator, rotation: int,
-                           live_coordinates: List[Dict[str, Any]] | None = None) -> bytes:
+                           live_coordinates: List[List[int]] | None = None) -> bytes:
     """Generate map image in SVG format from map data.
 
     Args:
@@ -270,7 +239,7 @@ def generate_svg_map_image(data: Dict[str, Any], historical_file_path: str | Non
         historical_file_path: Path to historical map file or None for current map
         coordinator: Coordinator instance
         rotation: Rotation angle in degrees (0, 90, 180, or 270) - required
-        live_coordinates: Optional list of live coordinate dicts for overlay during mowing
+        live_coordinates: Optional list of [x, y] coordinate pairs (in map units) for live overlay
     """
     
     # Create SVG document with off-white background
@@ -336,7 +305,7 @@ def generate_svg_map_image(data: Dict[str, Any], historical_file_path: str | Non
             trajectory_data = trajectory.get("data", [])
             all_points.extend(trajectory_data)
 
-        # Add current mower position if available (skip in live mode — different coord system)
+        # Add current mower position if available
         mower_position = None
         if not live_coordinates and hasattr(coordinator.device, 'mower_coordinates') and coordinator.device.mower_coordinates:
             mower_pos = coordinator.device.mower_coordinates
@@ -344,16 +313,9 @@ def generate_svg_map_image(data: Dict[str, Any], historical_file_path: str | Non
                 mower_position = [int(mower_pos[0]), int(mower_pos[1])]
                 all_points.append(mower_position)
 
-        # Add live coordinates to bounds (scale from pose units to centimeters)
+        # Add live coordinates to bounds (already in map units from pose handler)
         if live_coordinates:
-            # Compute map-only bounds first so we can detect overflow
-            map_bounds = calculate_bounds(all_points) if all_points else (0, 0, 0, 0)
-            map_min_x, map_min_y = map_bounds[0], map_bounds[1]
-            map_max_x, map_max_y = map_bounds[2], map_bounds[3]
-            for coord in live_coordinates:
-                lx = _scale_live_x(coord['x'], map_min_x, map_max_x)
-                ly = _scale_live_y(coord['y'], map_min_y, map_max_y)
-                all_points.append([lx, ly])
+            all_points.extend(live_coordinates)
 
         if not all_points:
             svg_lines.append(f'<text x="{MAP_IMAGE_WIDTH // 2}" y="{MAP_IMAGE_HEIGHT // 2}" font-family="Arial, sans-serif" font-size="16" fill="{COLORS_SVG["text_color"]}" text-anchor="middle">No map data available</text>')
@@ -439,33 +401,27 @@ def generate_svg_map_image(data: Dict[str, Any], historical_file_path: str | Non
                                         COLORS_SVG['current_position'], COLORS_SVG['text_color'])
                 svg_lines.append(mower_circle)
 
-            # 8. Draw live tracking overlay
+            # 8. Draw live tracking overlay (coordinates already in map units)
             if live_coordinates:
-                if len(live_coordinates) > 1:
-                    live_points = []
-                    for coord in live_coordinates:
-                        lx = _scale_live_x(coord['x'], map_min_x, map_max_x)
-                        ly = _scale_live_y(coord['y'], map_min_y, map_max_y)
-                        live_points.append([lx, ly])
-
-                    live_path = svg_path_from_segments([live_points], bounds, MAP_IMAGE_WIDTH, MAP_IMAGE_HEIGHT,
+                # Filter out sentinel break markers for rendering
+                valid_live = [p for p in live_coordinates if p[0] != 2147483647 and p[1] != 2147483647]
+                if len(valid_live) > 1:
+                    live_path = svg_path_from_segments([valid_live], bounds, MAP_IMAGE_WIDTH, MAP_IMAGE_HEIGHT,
                                                       COLORS_SVG['live_path'], 4)
                     if live_path:
                         svg_lines.append(live_path)
 
                     # Start position
-                    svg_lines.append(svg_circle(live_points[0][0], live_points[0][1], bounds,
+                    svg_lines.append(svg_circle(valid_live[0][0], valid_live[0][1], bounds,
                                                MAP_IMAGE_WIDTH, MAP_IMAGE_HEIGHT, 6,
                                                COLORS_SVG['start_position'], COLORS_SVG['text_color']))
                     # Current position
-                    svg_lines.append(svg_circle(live_points[-1][0], live_points[-1][1], bounds,
+                    svg_lines.append(svg_circle(valid_live[-1][0], valid_live[-1][1], bounds,
                                                MAP_IMAGE_WIDTH, MAP_IMAGE_HEIGHT, 8,
                                                COLORS_SVG['current_position'], '#8b0000'))
 
-                elif len(live_coordinates) == 1:
-                    lx = _scale_live_x(live_coordinates[0]['x'], map_min_x, map_max_x)
-                    ly = _scale_live_y(live_coordinates[0]['y'], map_min_y, map_max_y)
-                    svg_lines.append(svg_circle(lx, ly, bounds,
+                elif len(valid_live) == 1:
+                    svg_lines.append(svg_circle(valid_live[0][0], valid_live[0][1], bounds,
                                                MAP_IMAGE_WIDTH, MAP_IMAGE_HEIGHT, 8,
                                                COLORS_SVG['current_position'], '#8b0000'))
 
@@ -520,16 +476,17 @@ def generate_svg_map_image(data: Dict[str, Any], historical_file_path: str | Non
 
         # Add status overlay
         if live_coordinates:
-            # Calculate live status info
+            # Calculate live status info (coordinates are already in map units)
             total_distance: float = 0.0
-            if len(live_coordinates) > 1:
-                for i in range(1, len(live_coordinates)):
-                    prev = live_coordinates[i-1]
-                    curr = live_coordinates[i]
-                    dx = _scale_live_x(curr['x'], map_min_x, map_max_x) - _scale_live_x(prev['x'], map_min_x, map_max_x)
-                    dy = _scale_live_y(curr['y'], map_min_y, map_max_y) - _scale_live_y(prev['y'], map_min_y, map_max_y)
+            valid_live_for_dist = [p for p in live_coordinates if p[0] != 2147483647 and p[1] != 2147483647]
+            if len(valid_live_for_dist) > 1:
+                for i in range(1, len(valid_live_for_dist)):
+                    prev = valid_live_for_dist[i-1]
+                    curr = valid_live_for_dist[i]
+                    dx = curr[0] - prev[0]
+                    dy = curr[1] - prev[1]
                     total_distance += (dx**2 + dy**2) ** 0.5
-                total_distance = total_distance / 1000  # Convert mm to meters
+                total_distance = total_distance / 1000  # Convert map units to meters
 
             progress_info = ""
             if hasattr(coordinator.device, '_pose_coverage_handler'):

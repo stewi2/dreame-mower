@@ -1336,26 +1336,25 @@ async def test_mission_completion_caps_progress_at_100_percent(device):
     device.register_property_callback(property_change_callback)
     
     # First, simulate progress at 96% via pose coverage property (1:4)
-    # Create payload with 96/100 sqm progress
+    # Full 33-byte payload: [CE] pose(6) trace(15) task(10) [CE]
+    # Pose: x=0, y=0, angle=0 (all zeros)
+    # Trace: zeros (no deltas)
+    # Task at raw[22:32]:
+    #   [22]=region_id=0  [23]=task_id=0
+    #   [24:26]=percent uint16 LE=960 (96.0%)  -> 0xC0, 0x03
+    #   [26:29]=total uint24 LE=10000 (100 sqm) -> 0x10, 0x27, 0x00
+    #   [29:32]=finish uint24 LE=9600 (96 sqm)  -> 0x80, 0x25, 0x00
     progress_message = {
         'method': 'properties_changed',
         'params': [{
             'siid': 1, 
             'piid': 4,
             'value': [
-                0xCE,  # Start sentinel
-                100, 0,  # X
-                200, 0,  # Y
-                0, 0,  # padding
-                45, 0,  # Heading
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  # other data
-                5, 0,  # Segment
-                0,  # padding
-                16, 39,  # Total: 10000 centi-sqm (100 sqm)
-                0,  # padding
-                128, 37,  # Current: 9600 centi-sqm (96 sqm)
-                0,  # padding
-                0xCE  # End sentinel
+                0xCE,
+                0, 0, 0, 0, 0, 0,                     # pose (6 bytes)
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  # trace (15 bytes)
+                0, 0, 0xC0, 0x03, 0x10, 0x27, 0x00, 0x80, 0x25, 0x00,  # task (10 bytes)
+                0xCE
             ]
         }]
     }
@@ -1460,14 +1459,17 @@ async def test_full_mission_lifecycle_workflow(device):
     assert device._pose_coverage_handler._mission_completed is False
     
     # Step 2: Simulate progress updates during mowing (50%, then 96%)
+    # Task layout: [region_id, task_id, percent_lo, percent_hi, total(3), finish(3)]
     progress_50 = {
         'method': 'properties_changed',
         'params': [{
             'siid': 1, 'piid': 4,
             'value': [
-                0xCE, 100, 0, 200, 0, 0, 0, 45, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                5, 0, 0, 16, 39, 0, 136, 19, 0, 0xCE
+                0xCE,
+                0, 0, 0, 0, 0, 0,                     # pose
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  # trace
+                0, 0, 0xF4, 0x01, 0x10, 0x27, 0x00, 0x88, 0x13, 0x00,  # task: 500=>50%, total=10000, finish=5000
+                0xCE
             ]
         }]
     }
@@ -1479,9 +1481,11 @@ async def test_full_mission_lifecycle_workflow(device):
         'params': [{
             'siid': 1, 'piid': 4,
             'value': [
-                0xCE, 150, 0, 250, 0, 0, 0, 90, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                8, 0, 0, 16, 39, 0, 128, 37, 0, 0xCE
+                0xCE,
+                0, 0, 0, 0, 0, 0,                     # pose
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  # trace
+                0, 0, 0xC0, 0x03, 0x10, 0x27, 0x00, 0x80, 0x25, 0x00,  # task: 960=>96%, total=10000, finish=9600
+                0xCE
             ]
         }]
     }
@@ -1529,9 +1533,11 @@ async def test_full_mission_lifecycle_workflow(device):
         'params': [{
             'siid': 1, 'piid': 4,
             'value': [
-                0xCE, 50, 0, 100, 0, 0, 0, 30, 0,
-                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-                2, 0, 0, 16, 39, 0, 184, 11, 0, 0xCE
+                0xCE,
+                0, 0, 0, 0, 0, 0,                     # pose
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,  # trace
+                0, 0, 0x2C, 0x01, 0x10, 0x27, 0x00, 0xB8, 0x0B, 0x00,  # task: 300=>30%, total=10000, finish=3000
+                0xCE
             ]
         }]
     }

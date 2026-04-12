@@ -363,13 +363,13 @@ class DreameMowerDevice:
         return self._pose_coverage_handler.segment
 
     @property
-    def mower_heading(self) -> int | None:
-        """Return current mower heading/state value."""
+    def mower_heading(self) -> float | None:
+        """Return current mower heading in degrees."""
         return self._pose_coverage_handler.heading
 
     @property
-    def mowing_path_history(self) -> list[dict[str, Any]]:
-        """Return path history for visualization."""
+    def mowing_path_history(self) -> list[list[int]]:
+        """Return path history for visualization (list of [x, y] in map units)."""
         return self._pose_coverage_handler.path_history
 
     def _resolved_vector_map(self) -> MowerVectorMap | None:

@@ -1,15 +1,31 @@
 """Pose and Coverage property handling for Dreame Mower Implementation.
 
-This module provides parsing and handling for Service 1, Property 4 (1:4) which contains:
-- Mowing progress data with current and total area information
-- X/Y coordinates describing the mowing path
-- Additional metadata like segment information
+This module provides parsing and handling for Service 1, Property 4 (1:4) which
+contains robot pose (position and heading) encoded as 20-bit overlapping signed
+values, mowing track deltas relative to the robot pose, and mowing progress data.
 
-The property can contain two different data formats:
-1. Full mowing data (33-byte payload) - sent regularly during mowing sessions
-2. Shorter format (8-byte payload) - unknown purpose, less common
+Payload structure (with 0xCE sentinel framing)::
 
-Based on analysis from dev/analyses/README_property_1_4.md and dev/analyze_property_1_4.py
+    33-byte raw (full):  [CE] [pose:6] [trace:15] [task:10] [CE]
+    44-byte raw (ext):   [CE] [pose:6] [trace1:15] [task:10] [trace2:11] [CE]
+    22-byte raw:         [CE] [pose:6] [trace:15]
+    13-byte raw:         [CE] [pose:6] [extra:5]
+    11-byte raw (alt):   [task:10] [CE]  (no leading sentinel)
+
+Pose encoding (6 bytes)::
+
+    X = 20-bit signed from bytes 0-2 (byte 2 low nibble)
+    Y = 20-bit signed from bytes 2-4 (byte 2 high nibble)
+    Angle = byte 5 mapped to 0-360 degrees
+
+Track encoding (11 or 15 bytes)::
+
+    Bytes 0-2: 24-bit LE start index
+    Then pairs of int16 LE (dx, dy) deltas from the robot pose.
+    Sentinel: |dx| > 32766 AND |dy| > 32766 marks a segment break.
+
+Robot coordinates are in "pose units".  Multiplying by 10 converts them to the
+same unit system as the batch-API zone / M_PATH coordinates.
 """
 
 from __future__ import annotations
@@ -35,19 +51,120 @@ COORDINATES_Y_FIELD = "y"
 COORDINATES_SEGMENT_FIELD = "segment"
 COORDINATES_HEADING_FIELD = "heading"
 
-# Data format constants
-SENTINEL_BYTE = 206  # 0xCE - frame delimiter
-FULL_PAYLOAD_LENGTH = 31  # Expected payload length for full format
-MEDIUM_PAYLOAD_LENGTH = 11  # Expected payload length for medium format (two coordinate pairs + metadata)
-SHORT_PAYLOAD_LENGTH = 6   # Expected payload length for short format
+# Frame delimiter
+SENTINEL_BYTE = 0xCE  # 206
 
-# Byte positions in payload (0-indexed)
-X_POSITION = (0, 1)      # int16 LE - X coordinate
-Y_POSITION = (2, 3)      # int16 LE - Y coordinate  
-HEADING_POSITION = (6, 7) # int16 LE - Heading/state
-SEGMENT_POSITION = (22, 23) # uint16 - Segment/lane index
-CURRENT_AREA_POSITION = (28, 29) # uint16 - Current area (centi-sqm)
-TOTAL_AREA_POSITION = (25, 26)   # uint16 - Total area (centi-sqm)
+# Pose units -> map units multiplier
+_POSE_SCALE = 10
+
+# Track delta sentinel threshold
+_TRACK_SENTINEL_THRESHOLD = 32766
+
+# Sentinel coordinate value used for segment breaks in track data
+_SEGMENT_BREAK = 2147483647
+
+
+def _parse_pose(data: List[int], offset: int) -> tuple[int, int, float]:
+    """Extract robot pose from 6 bytes using 20-bit overlapping encoding."""
+    b0 = data[offset]
+    b1 = data[offset + 1]
+    b2 = data[offset + 2]
+    b3 = data[offset + 3]
+    b4 = data[offset + 4]
+    b5 = data[offset + 5]
+
+    # 20-bit signed X from b0, b1, low nibble of b2
+    # JS: x = (b2 << 28 | b1 << 20 | b0 << 12) >> 12
+    raw_x = (b2 << 28) | (b1 << 20) | (b0 << 12)
+    raw_x &= 0xFFFFFFFF  # constrain to 32-bit unsigned
+    if raw_x & 0x80000000:
+        raw_x -= 0x100000000  # convert to signed
+    x = raw_x >> 12
+
+    # 20-bit signed Y from high nibble of b2, b3, b4
+    # JS: y = (b4 << 24 | b3 << 16 | b2 << 8) >> 12
+    raw_y = (b4 << 24) | (b3 << 16) | (b2 << 8)
+    raw_y &= 0xFFFFFFFF
+    if raw_y & 0x80000000:
+        raw_y -= 0x100000000
+    y = raw_y >> 12
+
+    angle = b5 / 255.0 * 360.0
+
+    return x, y, angle
+
+
+def _parse_track_deltas(
+    data: List[int],
+    offset: int,
+    length: int,
+    base_x: int,
+    base_y: int,
+) -> tuple[int, list[list[int]]]:
+    """Extract track points from a trace chunk.
+
+    Args:
+        data: Raw byte list (full message including sentinels).
+        offset: Start offset of the trace chunk within data.
+        length: Number of bytes in the trace chunk.
+        base_x: Robot X in map units (pose_x * _POSE_SCALE).
+        base_y: Robot Y in map units (pose_y * _POSE_SCALE).
+
+    Returns:
+        (start_index, points) where points is a list of [x, y] in map units.
+        Segment-break sentinels are represented as [_SEGMENT_BREAK, _SEGMENT_BREAK].
+    """
+    if length < 7:
+        return 0, []
+
+    # 24-bit LE start index
+    start_index = data[offset] | (data[offset + 1] << 8) | (data[offset + 2] << 16)
+
+    num_pairs = (length - 3) // 4
+    points: list[list[int]] = []
+
+    for i in range(num_pairs):
+        pair_off = offset + 3 + i * 4
+        dx = struct.unpack_from("<h", bytes(data[pair_off : pair_off + 2]))[0]
+        dy = struct.unpack_from("<h", bytes(data[pair_off + 2 : pair_off + 4]))[0]
+
+        if abs(dx) > _TRACK_SENTINEL_THRESHOLD and abs(dy) > _TRACK_SENTINEL_THRESHOLD:
+            points.append([_SEGMENT_BREAK, _SEGMENT_BREAK])
+        else:
+            # Deltas are relative to the *unscaled* pose.  base_x/base_y are already
+            # pose * _POSE_SCALE, so scale deltas by the same factor.
+            points.append([base_x + dx * _POSE_SCALE, base_y + dy * _POSE_SCALE])
+
+    return start_index, points
+
+
+def _parse_task(data: List[int], offset: int) -> dict[str, Any]:
+    """Extract mowing task/progress from 10 bytes.
+
+    Layout (relative to offset)::
+
+        [0] region_id  [1] task_id
+        [2:4] percent (uint16 LE, value * 10)
+        [4:7] total area (uint24 LE, centi-sqm)
+        [7:10] finished area (uint24 LE, centi-sqm)
+    """
+    region_id = data[offset]
+    task_id = data[offset + 1]
+    raw_percent = data[offset + 2] | (data[offset + 3] << 8)
+    total = data[offset + 4] | (data[offset + 5] << 8) | (data[offset + 6] << 16)
+    finish = data[offset + 7] | (data[offset + 8] << 8) | (data[offset + 9] << 16)
+
+    total_sqm = total / 100.0 if total else 0.0
+    finish_sqm = finish / 100.0 if finish else 0.0
+    progress = min(100.0, raw_percent / 10.0) if raw_percent else 0.0
+
+    return {
+        "region_id": region_id,
+        "task_id": task_id,
+        "current_area_sqm": finish_sqm,
+        "total_area_sqm": total_sqm,
+        "progress_percent": progress,
+    }
 
 
 class PoseCoverageHandler:
@@ -59,168 +176,78 @@ class PoseCoverageHandler:
         self._current_area_sqm: float | None = None
         self._total_area_sqm: float | None = None
         self._progress_percent: float | None = None
-        self._mission_completed: bool = False  # Flag to indicate mission completion
+        self._mission_completed: bool = False
         
-        # Coordinate tracking
+        # Robot pose (in map units = pose * _POSE_SCALE)
         self._x_coordinate: int | None = None
         self._y_coordinate: int | None = None
+        self._heading: float | None = None
         self._segment: int | None = None
-        self._heading: int | None = None
-        
-        # Path history for visualization
-        self._path_history: List[Dict[str, Any]] = []
+
+        # Newly accumulated track points (list of [x, y] in map units)
+        self._new_track_points: list[list[int]] = []
+        # Full path history
+        self._path_history: list[list[int]] = []
     
     def parse_value(self, value: Any) -> bool:
-        """Parse pose coverage value from binary array."""
+        """Parse pose coverage value from the raw IoT property byte array.
+
+        Handles multiple payload lengths as observed across device firmware
+        versions.
+        """
         try:
-            # Ensure we have a list of integers (byte array)
             if not isinstance(value, list):
                 _LOGGER.warning("Invalid pose coverage value type: %s", type(value))
                 return False
             
-            if len(value) < 8:
-                _LOGGER.warning("Pose coverage payload too short: %d bytes", len(value))
+            n = len(value)
+            if n < 8:
+                _LOGGER.warning("Pose coverage payload too short: %d bytes", n)
                 return False
-            
-            # Verify sentinel bytes
+
+            # Clear new track points for this update
+            self._new_track_points = []
+
+            # Dispatch based on framing:
+            #   payload[0] != 0xCE AND payload[-1] == 0xCE -> alt format (task only)
+            #   payload[0] == 0xCE AND payload[-1] == 0xCE -> standard sentinel-framed
+            if value[0] != SENTINEL_BYTE and value[-1] == SENTINEL_BYTE:
+                return self._parse_alt_format(value)
+
             if value[0] != SENTINEL_BYTE or value[-1] != SENTINEL_BYTE:
-                _LOGGER.warning("Invalid sentinel bytes in pose coverage data: start=%d, end=%d", 
-                              value[0], value[-1])
+                _LOGGER.warning(
+                    "Invalid sentinel bytes: start=0x%02X, end=0x%02X",
+                    value[0], value[-1],
+                )
                 return False
-            
-            # Extract payload (remove sentinel bytes)
-            payload = value[1:-1]
-            payload_length = len(payload)
-            
-            if payload_length == FULL_PAYLOAD_LENGTH:
-                return self._parse_full_format(payload)
-            elif payload_length == MEDIUM_PAYLOAD_LENGTH:
-                return self._parse_medium_format(payload)
-            elif payload_length == SHORT_PAYLOAD_LENGTH:
-                return self._parse_short_format(payload)
-            elif payload_length == 8:
-                # 8-byte format observed in issue #24 - meaning unknown, silently acknowledge
+
+            if n == 33:
+                # [CE] pose(6) trace(15) task(10) [CE]
+                return self._parse_full_format(value)
+            elif n == 44:
+                # [CE] pose(6) trace1(15) task(10) trace2(11) [CE]
+                return self._parse_extended_format(value)
+            elif n == 22:
+                # [CE] pose(6) trace(15)
+                return self._parse_pose_trace_format(value)
+            elif n == 13:
+                # [CE] pose(6) extra(5)
+                return self._parse_pose_short_format(value)
+            elif n == 8:
+                # Meaning unknown — silently acknowledge
                 return True
             else:
-                _LOGGER.warning("Unknown pose coverage payload length: %d bytes", payload_length)
-                return False
-                
+                _LOGGER.debug("Unrecognised pose coverage payload length: %d", n)
+                return self._parse_fallback(value)
+
         except Exception as ex:
             _LOGGER.error("Failed to parse pose coverage data: %s", ex)
             return False
     
-    def _parse_full_format(self, payload: List[int]) -> bool:
-        """Parse full format (31-byte payload) with complete mowing data."""
-        try:
-            # Extract coordinates (int16 little-endian)
-            x = self._read_int16_le(payload, X_POSITION[0])
-            y = self._read_int16_le(payload, Y_POSITION[0])
-            
-            # Extract heading/state
-            heading = self._read_int16_le(payload, HEADING_POSITION[0])
-            
-            # Extract segment information
-            segment = self._read_uint16_le(payload, SEGMENT_POSITION[0])
-            
-            # Extract area information (convert from centi-sqm to sqm)
-            current_area_centisqm = self._read_uint16_le(payload, CURRENT_AREA_POSITION[0])
-            total_area_centisqm = self._read_uint16_le(payload, TOTAL_AREA_POSITION[0])
-            
-            current_area_sqm = current_area_centisqm / 100.0
-            total_area_sqm = total_area_centisqm / 100.0
-            
-            # Calculate progress percentage
-            progress_percent = 0.0
-            if total_area_sqm > 0:
-                progress_percent = min(100.0, (current_area_sqm / total_area_sqm) * 100.0)
-            
-            # If mission is marked as completed, cap progress at 100%
-            if self._mission_completed and progress_percent > 0:
-                progress_percent = 100.0
-            
-            # Update state
-            self._x_coordinate = x
-            self._y_coordinate = y
-            self._heading = heading
-            self._segment = segment
-            self._current_area_sqm = current_area_sqm
-            self._total_area_sqm = total_area_sqm
-            self._progress_percent = progress_percent
-            
-            # Add to path history (keep last 1000 points to avoid memory issues)
-            path_point = {
-                "x": x,
-                "y": y,
-                "heading": heading,
-                "segment": segment,
-                "timestamp": None  # Will be added by caller if available
-            }
-            self._path_history.append(path_point)
-            if len(self._path_history) > 1000:
-                self._path_history.pop(0)
-            
-            return True
-            
-        except Exception as ex:
-            _LOGGER.error("Failed to parse full format pose coverage: %s", ex)
-            return False
-    
-    def _parse_medium_format(self, payload: List[int]) -> bool:
-        """Parse medium format (11-byte payload) with two coordinate pairs.
+    # ------------------------------------------------------------------
+    # Notification data accessors
+    # ------------------------------------------------------------------
 
-        Observed in issues #49, #50, #51 (mova.mower.g2529d fw 4.3.6_0169).
-        Structure: x1(2) + y1(2) + metadata(1) + unknown(1) + x2(2) + y2(2) + metadata(1).
-        We extract the primary x,y from the first pair; the second pair and metadata
-        bytes are not yet fully understood.
-        """
-        try:
-            x = self._read_int16_le(payload, 0)
-            y = self._read_int16_le(payload, 2)
-            self._x_coordinate = x
-            self._y_coordinate = y
-            _LOGGER.debug("Medium pose coverage parsed: x=%d, y=%d (11-byte format)", x, y)
-            return True
-        except Exception as ex:
-            _LOGGER.error("Failed to parse medium format pose coverage: %s", ex)
-            return False
-
-    def _parse_short_format(self, payload: List[int]) -> bool:
-        """Parse short format (6-byte payload) with limited data."""
-        try:
-            # For now, just extract coordinates from short format
-            # The meaning of other bytes is not yet understood
-            x = self._read_int16_le(payload, 0)
-            y = self._read_int16_le(payload, 2)
-            
-            # Update coordinate state only
-            self._x_coordinate = x
-            self._y_coordinate = y
-            
-            _LOGGER.debug("Short pose coverage parsed: x=%d, y=%d", x, y)
-            return True
-            
-        except Exception as ex:
-            _LOGGER.error("Failed to parse short format pose coverage: %s", ex)
-            return False
-    
-    def _read_int16_le(self, payload: List[int], offset: int) -> int:
-        """Read 16-bit signed integer in little-endian format."""
-        if offset + 1 >= len(payload):
-            raise ValueError(f"Payload too short for int16 at offset {offset}")
-        
-        # Pack bytes and unpack as little-endian signed short
-        bytes_data = bytes([payload[offset], payload[offset + 1]])
-        return struct.unpack('<h', bytes_data)[0]
-    
-    def _read_uint16_le(self, payload: List[int], offset: int) -> int:
-        """Read 16-bit unsigned integer in little-endian format."""
-        if offset + 1 >= len(payload):
-            raise ValueError(f"Payload too short for uint16 at offset {offset}")
-        
-        # Pack bytes and unpack as little-endian unsigned short  
-        bytes_data = bytes([payload[offset], payload[offset + 1]])
-        return struct.unpack('<H', bytes_data)[0]
-    
     def get_progress_notification_data(self) -> Dict[str, Any]:
         """Get progress notification data for Home Assistant."""
         return {
@@ -230,55 +257,60 @@ class PoseCoverageHandler:
         }
     
     def get_coordinates_notification_data(self) -> Dict[str, Any]:
-        """Get coordinates notification data for Home Assistant."""
+        """Get coordinates notification data for Home Assistant.
+
+        The returned dict includes a ``track_points`` key with any newly
+        extracted track points from this parse cycle (list of [x, y] in map units).
+        """
         return {
             COORDINATES_X_FIELD: self._x_coordinate,
             COORDINATES_Y_FIELD: self._y_coordinate,
             COORDINATES_SEGMENT_FIELD: self._segment,
             COORDINATES_HEADING_FIELD: self._heading,
+            "track_points": self._new_track_points,
         }
     
-    # Properties for direct access
+    # ------------------------------------------------------------------
+    # Properties
+    # ------------------------------------------------------------------
+
     @property
     def current_area_sqm(self) -> float | None:
-        """Return current mowed area in square meters."""
         return self._current_area_sqm
     
     @property
     def total_area_sqm(self) -> float | None:
-        """Return total planned area in square meters."""
         return self._total_area_sqm
     
     @property
     def progress_percent(self) -> float | None:
-        """Return mowing progress percentage."""
         return self._progress_percent
     
     @property
     def x_coordinate(self) -> int | None:
-        """Return current X coordinate."""
         return self._x_coordinate
     
     @property
     def y_coordinate(self) -> int | None:
-        """Return current Y coordinate."""
         return self._y_coordinate
     
     @property
     def segment(self) -> int | None:
-        """Return current segment/lane index."""
         return self._segment
     
     @property
-    def heading(self) -> int | None:
-        """Return current heading/state value."""
+    def heading(self) -> float | None:
         return self._heading
     
     @property
-    def path_history(self) -> List[Dict[str, Any]]:
-        """Return path history for visualization."""
+    def path_history(self) -> list[list[int]]:
+        """Return accumulated track path (list of [x, y] in map units)."""
         return self._path_history.copy()
-    
+
+    # ------------------------------------------------------------------
+    # Lifecycle helpers
+    # ------------------------------------------------------------------
+
     def clear_path_history(self) -> None:
         """Clear the path history (e.g., when a new mowing session starts)."""
         self._path_history.clear()
@@ -287,24 +319,111 @@ class PoseCoverageHandler:
     def mark_mission_completed(self) -> None:
         """Mark the current mission as completed.
         
-        This will cap the progress percentage at 100% even if the calculated
-        progress based on area is slightly less (e.g., 96%).
-        Called when a mission completion event is received.
+        Caps progress at 100% even if the calculated value is slightly less.
         """
         self._mission_completed = True
-        # Update progress to 100% if we have valid data
         if self._progress_percent is not None and self._progress_percent > 0:
             self._progress_percent = 100.0
         _LOGGER.debug("Mission marked as completed, progress set to 100%%")
     
     def reset_mission_completion(self) -> None:
-        """Reset the mission completion flag for a new mission.
-        
-        Called when a new mowing session starts to allow normal progress tracking.
-        """
+        """Reset the mission completion flag for a new mission."""
         self._mission_completed = False
         _LOGGER.debug("Mission completion flag reset")
 
+    # ------------------------------------------------------------------
+    # Private: apply parsed data
+    # ------------------------------------------------------------------
 
-# Unified property handler combining both functionalities
+    def _apply_pose(self, x_raw: int, y_raw: int, angle: float) -> tuple[int, int]:
+        """Scale raw pose to map units and store."""
+        mx = x_raw * _POSE_SCALE
+        my = y_raw * _POSE_SCALE
+        self._x_coordinate = mx
+        self._y_coordinate = my
+        self._heading = round(angle, 2)
+        return mx, my
+
+    def _apply_task(self, task: dict[str, Any]) -> None:
+        """Store task/progress data."""
+        self._current_area_sqm = task["current_area_sqm"]
+        self._total_area_sqm = task["total_area_sqm"]
+        self._progress_percent = task["progress_percent"]
+        self._segment = task.get("region_id")
+        if self._mission_completed and self._progress_percent and self._progress_percent > 0:
+            self._progress_percent = 100.0
+
+    def _apply_track(self, points: list[list[int]]) -> None:
+        """Accumulate track points (both new and history)."""
+        if not points:
+            return
+        self._new_track_points.extend(points)
+        self._path_history.extend(points)
+        # Cap history to avoid unbounded growth
+        if len(self._path_history) > 5000:
+            self._path_history = self._path_history[-5000:]
+
+    # ------------------------------------------------------------------
+    # Private: format handlers
+    # ------------------------------------------------------------------
+
+    def _parse_full_format(self, raw: List[int]) -> bool:
+        """33 raw bytes: [CE] pose(6) trace(15) task(10) [CE]."""
+        x, y, angle = _parse_pose(raw, offset=1)
+        mx, my = self._apply_pose(x, y, angle)
+
+        _idx, pts = _parse_track_deltas(raw, offset=7, length=15, base_x=mx, base_y=my)
+        self._apply_track(pts)
+
+        task = _parse_task(raw, offset=22)
+        self._apply_task(task)
+        return True
+
+    def _parse_extended_format(self, raw: List[int]) -> bool:
+        """44 raw bytes: [CE] pose(6) trace1(15) task(10) trace2(11) [CE]."""
+        x, y, angle = _parse_pose(raw, offset=1)
+        mx, my = self._apply_pose(x, y, angle)
+
+        _idx1, pts1 = _parse_track_deltas(raw, offset=7, length=15, base_x=mx, base_y=my)
+        self._apply_track(pts1)
+
+        task = _parse_task(raw, offset=22)
+        self._apply_task(task)
+
+        _idx2, pts2 = _parse_track_deltas(raw, offset=32, length=11, base_x=mx, base_y=my)
+        self._apply_track(pts2)
+        return True
+
+    def _parse_pose_trace_format(self, raw: List[int]) -> bool:
+        """22 raw bytes: [CE] pose(6) trace(15)."""
+        x, y, angle = _parse_pose(raw, offset=1)
+        mx, my = self._apply_pose(x, y, angle)
+
+        _idx, pts = _parse_track_deltas(raw, offset=7, length=15, base_x=mx, base_y=my)
+        self._apply_track(pts)
+        return True
+
+    def _parse_pose_short_format(self, raw: List[int]) -> bool:
+        """13 raw bytes: [CE] pose(6) extra(5) — pose only."""
+        x, y, angle = _parse_pose(raw, offset=1)
+        self._apply_pose(x, y, angle)
+        return True
+
+    def _parse_alt_format(self, raw: List[int]) -> bool:
+        """11/22 raw bytes without leading sentinel: task(10) [CE] [+ trace]."""
+        if len(raw) >= 11:
+            task = _parse_task(raw, offset=0)
+            self._apply_task(task)
+        return True
+
+    def _parse_fallback(self, raw: List[int]) -> bool:
+        """Best-effort: try to extract at least the pose."""
+        if len(raw) >= 8:  # sentinel + 6 pose bytes + sentinel minimum
+            x, y, angle = _parse_pose(raw, offset=1)
+            self._apply_pose(x, y, angle)
+            return True
+        return False
+
+
+# Alias used by device.py imports
 PoseCoveragePropertyHandler = PoseCoverageHandler

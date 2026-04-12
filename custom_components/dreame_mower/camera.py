@@ -62,7 +62,7 @@ class DreameMowerCameraEntity(DreameMowerEntity, Camera):
         self._is_on = True
 
         # Live mode state
-        self._live_coordinates: list[dict[str, Any]] = []  # Current session live coordinates
+        self._live_coordinates: list[list[int]] = []  # [x, y] pairs in map units
         
         # Periodic property request timer for live mode
         self._pose_coverage_timer: Timer | None = None
@@ -298,10 +298,25 @@ class DreameMowerCameraEntity(DreameMowerEntity, Camera):
                     self._start_pose_coverage_timer()
 
     def _handle_live_coordinates_update(self, coordinates_data: dict[str, Any]) -> None:
-        """Handle live coordinate updates during mowing session."""
+        """Handle live coordinate updates during mowing session.
+
+        Coordinates are now in map units (same as zone data) after 20-bit
+        pose parsing with *10 scaling.  Track points from pose coverage
+        deltas are also included.
+        """
         try:
-            # Add coordinates to live tracking
-            self._live_coordinates.append(coordinates_data)
+            x = coordinates_data.get('x')
+            y = coordinates_data.get('y')
+
+            # Append robot position as [x, y]
+            if x is not None and y is not None:
+                self._live_coordinates.append([int(x), int(y)])
+
+            # Append any track points from this update (already in map units)
+            for pt in coordinates_data.get('track_points', []):
+                # Skip segment-break sentinels
+                if pt[0] != 2147483647 and pt[1] != 2147483647:
+                    self._live_coordinates.append(pt)
             
             # Limit live coordinates to last 2000 points to avoid memory issues
             if len(self._live_coordinates) > 2000:
