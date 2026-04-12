@@ -232,6 +232,9 @@ class DreameMowerCameraEntity(DreameMowerEntity, Camera):
     def _build_historical_files_list_sync(self) -> list[tuple[str, float]]:
         """Build the historical files list synchronously (runs in executor).
         
+        Only includes files whose name starts with this device's ID
+        (format: ``{device_id}_{timestamp}.json``).
+
         Returns:
             List of (file_path, mtime) tuples sorted by modification time (newest first)
         """
@@ -246,11 +249,14 @@ class DreameMowerCameraEntity(DreameMowerEntity, Camera):
             if not os.path.exists(ali_dreame_path):
                 return []
             
-            # Find all .json files recursively
+            device_id = self.coordinator.device.device_id
+            prefix = f"{device_id}_"
+
+            # Find .json files belonging to this device
             json_files = []
             for root, dirs, files in os.walk(ali_dreame_path):
                 for file in files:
-                    if file.endswith('.json'):
+                    if file.endswith('.json') and file.startswith(prefix):
                         full_path = os.path.join(root, file)
                         try:
                             # Get file modification time
