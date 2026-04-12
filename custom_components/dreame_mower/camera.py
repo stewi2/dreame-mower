@@ -341,21 +341,11 @@ class DreameMowerCameraEntity(DreameMowerEntity, Camera):
 
     def _generate_live_image(self) -> bytes:
         """Generate live map image in SVG format with current coordinates overlay on vector map."""
-        # Prefer vector map from batch API — same coordinate system as live pose data.
-        # Historical map data uses a different (higher-resolution) coordinate system.
-        vector_map = self.coordinator.device.vector_map
-        if vector_map and vector_map.boundary:
-            data = vector_map_to_map_data(vector_map)
-            source = "vector_map"
-        elif self._current_map_data:
-            data = self._current_map_data
-            source = "historical"
-        else:
-            data = {}
-            source = "empty"
+        assert self.coordinator.device.vector_map is not None
+        map_data = vector_map_to_map_data(self.coordinator.device.vector_map)
 
         return generate_svg_map_image(
-            data, None, self.coordinator,
+            map_data, None, self.coordinator,
             rotation=self._current_rotation,
             live_coordinates=self._live_coordinates
         )

@@ -25,6 +25,7 @@ import pytest
 
 from custom_components.dreame_mower.camera import DreameMowerCameraEntity
 from custom_components.dreame_mower.dreame.device import DreameMowerDevice
+from custom_components.dreame_mower.dreame.map_data_parser import vector_map_to_map_data
 from custom_components.dreame_mower.dreame.property.pose_coverage import (
     POSE_COVERAGE_COORDINATES_PROPERTY_NAME,
 )
@@ -202,8 +203,11 @@ class TestLiveMowingMapIntegration:
         )
 
         # ── Snapshot 1: device layer ───────────────────────────────────
+        # Use vector map data (same coordinate system as live pose data)
+        vector_map = cam_device.vector_map
+        device_map_data = vector_map_to_map_data(vector_map) if vector_map and vector_map.boundary else {}
         device_svg = generate_svg_map_image(
-            session_fixture["map_data"],
+            device_map_data,
             None,
             cam_coordinator,
             rotation=0,

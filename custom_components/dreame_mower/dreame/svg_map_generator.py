@@ -230,6 +230,46 @@ def finish_svg_document(svg_lines: List[str]) -> str:
 
 
 
+def _scale_map_data(data: Dict[str, Any], factor: int = 10) -> Dict[str, Any]:
+    """Scale all coordinate points in map data by the given factor.
+
+    Historical ali_dreame JSON files store coordinates in decimeters while the
+    internal coordinate system (batch API, pose coverage) uses centimeters.
+    """
+    def scale_points(points: list) -> list:
+        return [
+            [p[0] * factor, p[1] * factor] if isinstance(p, list) and len(p) >= 2 else p
+            for p in points
+        ]
+
+    result = dict(data)
+
+    if "map" in result:
+        scaled_maps = []
+        for item in result["map"]:
+            scaled_item = dict(item)
+            if "data" in scaled_item:
+                scaled_item["data"] = scale_points(scaled_item["data"])
+            if "track" in scaled_item:
+                scaled_item["track"] = scale_points(scaled_item["track"])
+            scaled_maps.append(scaled_item)
+        result["map"] = scaled_maps
+
+    if "obstacle" in result:
+        scaled_obs = []
+        for obs in result["obstacle"]:
+            scaled_obs.append({**obs, "data": scale_points(obs.get("data", []))})
+        result["obstacle"] = scaled_obs
+
+    if "trajectory" in result:
+        scaled_traj = []
+        for traj in result["trajectory"]:
+            scaled_traj.append({**traj, "data": scale_points(traj.get("data", []))})
+        result["trajectory"] = scaled_traj
+
+    return result
+
+
 def generate_svg_map_image(data: Dict[str, Any], historical_file_path: str | None, coordinator, rotation: int,
                            live_coordinates: List[List[int]] | None = None) -> bytes:
     """Generate map image in SVG format from map data.
@@ -241,6 +281,11 @@ def generate_svg_map_image(data: Dict[str, Any], historical_file_path: str | Non
         rotation: Rotation angle in degrees (0, 90, 180, or 270) - required
         live_coordinates: Optional list of [x, y] coordinate pairs (in map units) for live overlay
     """
+
+    # Historical files use decimeter coordinates; scale to centimeters to match
+    # the internal coordinate system (batch API / pose coverage).
+    if historical_file_path:
+        data = _scale_map_data(data)
     
     # Create SVG document with off-white background
     svg_lines = create_svg_document(MAP_IMAGE_WIDTH, MAP_IMAGE_HEIGHT, '#f5f5f0')
