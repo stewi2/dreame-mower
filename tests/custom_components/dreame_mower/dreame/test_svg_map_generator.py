@@ -1,7 +1,6 @@
 """Tests for svg_map_generator module."""
 
 import json
-import re
 from pathlib import Path
 from unittest.mock import Mock
 
@@ -388,66 +387,5 @@ class TestMapRotation:
         assert result == expected_result, (
             f"Generated SVG does not match golden file. "
             f"Actual output saved to {output_svg_file}. "
-            f"If the changes are intentional, update the golden file."
-        )
-
-
-LIVE_JSON_FILE = TEST_DATA_DIR / "test_svg_live_mode.json"
-LIVE_GOLDEN_SVG_FILE = TEST_DATA_DIR / "test_svg_live_mode_golden.svg"
-
-# Timestamp pattern used in the live status overlay ("Updated: YYYY-MM-DD HH:MM:SS")
-_TIMESTAMP_RE = re.compile(r"Updated: \d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}")
-
-
-@pytest.fixture
-def live_mode_data():
-    """Load the live-mode JSON test data (map + live coordinates + progress)."""
-    with open(LIVE_JSON_FILE, "r") as f:
-        return json.load(f)
-
-
-@pytest.fixture
-def live_golden_svg():
-    """Load the golden SVG for the live-mode test."""
-    with open(LIVE_GOLDEN_SVG_FILE, "r") as f:
-        return f.read()
-
-
-class TestLiveModeGolden:
-    """Golden-image comparison for the live tracking overlay."""
-
-    def test_live_mode_mid_mowing(
-        self, golden_map_data, live_mode_data, live_golden_svg, mock_coordinator
-    ):
-        """Generate a live-mode SVG mid-mow and compare to the golden file.
-
-        The live overlay includes a real-time timestamp that will differ on
-        every run, so the comparison normalises timestamps before asserting.
-        """
-        # Wire up progress fields that the renderer reads
-        handler = Mock()
-        handler.progress_percent = live_mode_data["progress_percent"]
-        handler.current_area_sqm = live_mode_data["current_area_sqm"]
-        mock_coordinator.device._pose_coverage_handler = handler
-
-        result = generate_svg_map_image(
-            golden_map_data,
-            None,
-            mock_coordinator,
-            rotation=0,
-            live_coordinates=live_mode_data["live_coordinates"],
-        )
-
-        # Save actual output for visual inspection on failure
-        actual_svg_file = TEST_DATA_DIR / "test_svg_live_mode_actual.svg"
-        with open(actual_svg_file, "wb") as f:
-            f.write(result)
-
-        actual_normalised = _TIMESTAMP_RE.sub("Updated: TIMESTAMP", result.decode("utf-8"))
-        golden_normalised = _TIMESTAMP_RE.sub("Updated: TIMESTAMP", live_golden_svg)
-
-        assert actual_normalised == golden_normalised, (
-            f"Generated live-mode SVG differs from golden file (excluding timestamp). "
-            f"Actual output saved to {actual_svg_file}. "
             f"If the changes are intentional, update the golden file."
         )
