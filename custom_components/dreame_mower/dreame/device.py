@@ -829,9 +829,10 @@ class DreameMowerDevice:
                 #               dm::TASK_SLAM_RELOCATE_NEARDOCK (mower relocating near dock, issue #54)
                 #               dm::TASK_NAV_CRUISE_POINT (navigation to cruise point, issue #68)
                 #               dm::TASK_SLAM_EXIT_ERASE (SLAM exit erase, issue #60)
+                #               dm::TASK_SLAM_RELOCATE_OFFDOCK (mower relocating off dock, issue #93)
                 # TODO: Consider doing something useful with this property change later
                 property_value_str = str(message["value"])
-                if property_value_str in ("dm::TASK_NAV_DOCK", "dm::TASK_SLAM_RELOCATE", "dm::TASK_NAV_DIVIDE_REGION", "dm::TASK_SLAM_RELOCATE_NEARDOCK", "dm::TASK_NAV_CRUISE_POINT", "dm::TASK_SLAM_EXIT_ERASE"):
+                if property_value_str in ("dm::TASK_NAV_DOCK", "dm::TASK_SLAM_RELOCATE", "dm::TASK_NAV_DIVIDE_REGION", "dm::TASK_SLAM_RELOCATE_NEARDOCK", "dm::TASK_NAV_CRUISE_POINT", "dm::TASK_SLAM_EXIT_ERASE", "dm::TASK_SLAM_RELOCATE_OFFDOCK"):
                     self._notify_property_change(SERVICE2_PROPERTY_65.name, property_value_str)
                     _LOGGER.debug("2:65 value: %s", property_value_str)
                 else:

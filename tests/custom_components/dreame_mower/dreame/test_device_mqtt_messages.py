@@ -95,6 +95,15 @@ class TestDeviceMqttPropertyUpdate:
                 "service2_property_65",
                 lambda v: v == "dm::TASK_NAV_CRUISE_POINT"
             ),
+            (  # Issue #93: 2:65 dm::TASK_SLAM_RELOCATE_OFFDOCK (dreame.mower.p2255 fw 4.3.6_1542)
+                {
+                    "id": 206,
+                    "method": "properties_changed",
+                    "params": [{"did": "-1******55", "piid": 65, "siid": 2, "value": "dm::TASK_SLAM_RELOCATE_OFFDOCK"}]
+                },
+                "service2_property_65",
+                lambda v: v == "dm::TASK_SLAM_RELOCATE_OFFDOCK"
+            ),
             (  # Issue #51: 1:4 11-byte medium format (mova.mower.g2529d fw 4.3.6_0169)
                 {
                     "id": 244,
