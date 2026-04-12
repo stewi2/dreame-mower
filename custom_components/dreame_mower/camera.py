@@ -62,7 +62,7 @@ class DreameMowerCameraEntity(DreameMowerEntity, Camera):
         self._is_on = True
 
         # Live mode state
-        self._live_coordinates: list[dict[str, Any]] = []  # Current session live coordinates
+        self._live_coordinates: list[list[int]] = []  # [x, y] pairs in map units
         
         # Periodic property request timer for live mode
         self._pose_coverage_timer: Timer | None = None
@@ -232,6 +232,9 @@ class DreameMowerCameraEntity(DreameMowerEntity, Camera):
     def _build_historical_files_list_sync(self) -> list[tuple[str, float]]:
         """Build the historical files list synchronously (runs in executor).
         
+        Only includes files whose name starts with this device's ID
+        (format: ``{device_id}_{timestamp}.json``).
+
         Returns:
             List of (file_path, mtime) tuples sorted by modification time (newest first)
         """
@@ -246,11 +249,14 @@ class DreameMowerCameraEntity(DreameMowerEntity, Camera):
             if not os.path.exists(ali_dreame_path):
                 return []
             
-            # Find all .json files recursively
+            device_id = self.coordinator.device.device_id
+            prefix = f"{device_id}_"
+
+            # Find .json files belonging to this device
             json_files = []
             for root, dirs, files in os.walk(ali_dreame_path):
                 for file in files:
-                    if file.endswith('.json'):
+                    if file.endswith('.json') and file.startswith(prefix):
                         full_path = os.path.join(root, file)
                         try:
                             # Get file modification time
@@ -298,10 +304,19 @@ class DreameMowerCameraEntity(DreameMowerEntity, Camera):
                     self._start_pose_coverage_timer()
 
     def _handle_live_coordinates_update(self, coordinates_data: dict[str, Any]) -> None:
-        """Handle live coordinate updates during mowing session."""
+        """Handle live coordinate updates during mowing session.
+
+        Coordinates are now in map units (same as zone data) after 20-bit
+        pose parsing with *10 scaling.  Track points from pose coverage
+        deltas are also included.
+        """
         try:
-            # Add coordinates to live tracking
-            self._live_coordinates.append(coordinates_data)
+            x = coordinates_data.get('x')
+            y = coordinates_data.get('y')
+
+            # Append robot position as [x, y]
+            if x is not None and y is not None:
+                self._live_coordinates.append([int(x), int(y)])
             
             # Limit live coordinates to last 2000 points to avoid memory issues
             if len(self._live_coordinates) > 2000:
@@ -332,21 +347,11 @@ class DreameMowerCameraEntity(DreameMowerEntity, Camera):
 
     def _generate_live_image(self) -> bytes:
         """Generate live map image in SVG format with current coordinates overlay on vector map."""
-        # Prefer vector map from batch API — same coordinate system as live pose data.
-        # Historical map data uses a different (higher-resolution) coordinate system.
-        vector_map = self.coordinator.device.vector_map
-        if vector_map and vector_map.boundary:
-            data = vector_map_to_map_data(vector_map)
-            source = "vector_map"
-        elif self._current_map_data:
-            data = self._current_map_data
-            source = "historical"
-        else:
-            data = {}
-            source = "empty"
+        assert self.coordinator.device.vector_map is not None
+        map_data = vector_map_to_map_data(self.coordinator.device.vector_map)
 
         return generate_svg_map_image(
-            data, None, self.coordinator,
+            map_data, None, self.coordinator,
             rotation=self._current_rotation,
             live_coordinates=self._live_coordinates
         )
