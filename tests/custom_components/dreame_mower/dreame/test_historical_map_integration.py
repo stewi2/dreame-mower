@@ -102,6 +102,11 @@ class TestScaleMapData:
         scaled = _scale_map_data(data, factor=10)
         assert scaled["trajectory"][0]["data"] == [[70, 80]]
 
+    def test_dock_scaled(self):
+        data = {"dock": [127, 2, 3583]}
+        scaled = _scale_map_data(data, factor=10)
+        assert scaled["dock"] == [1270, 20, 3583], "only x,y scaled, heading preserved"
+
     def test_empty_data_noop(self):
         assert _scale_map_data({}) == {}
 

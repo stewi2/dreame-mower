@@ -268,6 +268,12 @@ def _scale_map_data(data: Dict[str, Any], factor: int = 10) -> Dict[str, Any]:
             scaled_traj.append({**traj, "data": scale_points(traj.get("data", []))})
         result["trajectory"] = scaled_traj
 
+    # Scale dock position [x, y, heading] — only x and y
+    if "dock" in result:
+        dock = result["dock"]
+        if isinstance(dock, list) and len(dock) >= 2:
+            result["dock"] = [dock[0] * factor, dock[1] * factor] + dock[2:]
+
     return result
 
 
@@ -353,11 +359,17 @@ def generate_svg_map_image(data: Dict[str, Any], historical_file_path: str | Non
 
         # Add current mower position if available
         mower_position = None
-        if not live_coordinates and hasattr(coordinator.device, 'mower_coordinates') and coordinator.device.mower_coordinates:
-            mower_pos = coordinator.device.mower_coordinates
-            if mower_pos is not None:
-                mower_position = [int(mower_pos[0]), int(mower_pos[1])]
+        if not live_coordinates:
+            # For historical maps, use dock position from map data (already scaled)
+            dock = data.get("dock")
+            if historical_file_path and dock and isinstance(dock, list) and len(dock) >= 2:
+                mower_position = [int(dock[0]), int(dock[1])]
                 all_points.append(mower_position)
+            elif hasattr(coordinator.device, 'mower_coordinates') and coordinator.device.mower_coordinates:
+                mower_pos = coordinator.device.mower_coordinates
+                if mower_pos is not None:
+                    mower_position = [int(mower_pos[0]), int(mower_pos[1])]
+                    all_points.append(mower_position)
 
         # Add live coordinates to bounds (already in map units from pose handler)
         if live_coordinates:
