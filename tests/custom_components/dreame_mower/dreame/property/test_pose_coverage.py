@@ -260,8 +260,8 @@ class TestFullFormatParsing:
         pts = coords["track_points"]
         assert len(pts) >= 2
         # First delta: base + delta*SCALE
-        assert pts[0] == [1000 + 50, 2000 + (-30)]
-        assert pts[1] == [1000 + 100, 2000 + 70]
+        assert pts[0] == [100 * _POSE_SCALE + 5 * _POSE_SCALE, 200 * _POSE_SCALE + (-3) * _POSE_SCALE]
+        assert pts[1] == [100 * _POSE_SCALE + 10 * _POSE_SCALE, 200 * _POSE_SCALE + 7 * _POSE_SCALE]
 
     def test_heading(self, handler):
         payload = _build_full_payload(angle=90.0)
@@ -342,8 +342,8 @@ class TestShortFormats:
         payload = [0xCE] + pose + [0, 0, 0, 0, 0] + [0xCE]
         assert len(payload) == 13
         assert handler.parse_value(payload) is True
-        assert handler.x_coordinate == 1000
-        assert handler.y_coordinate == 2000
+        assert handler.x_coordinate == 100 * _POSE_SCALE
+        assert handler.y_coordinate == 200 * _POSE_SCALE
 
     def test_8_bytes_acknowledged(self, handler):
         payload = [0xCE, 0, 0, 0, 0, 0, 0, 0xCE]
@@ -373,8 +373,8 @@ class TestNotificationData:
         payload = _build_full_payload(x=10, y=20, trace_deltas=[(1, 2)])
         handler.parse_value(payload)
         data = handler.get_coordinates_notification_data()
-        assert data["x"] == 100
-        assert data["y"] == 200
+        assert data["x"] == 10 * _POSE_SCALE
+        assert data["y"] == 20 * _POSE_SCALE
         assert "track_points" in data
         assert len(data["track_points"]) >= 1
 

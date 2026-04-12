@@ -180,13 +180,16 @@ class TestLiveMowingMapIntegration:
         )
         cam_device.fetch_vector_map()
 
-        # Also collect raw coordinates for the device-layer snapshot.
-        live_coordinates: list[dict] = []
+        # Also collect coordinates for the device-layer snapshot,
+        # converting to [x, y] lists the same way camera.py does.
+        live_coordinates: list[list[int]] = []
 
         def _collect_coords(name, value):
             if name == POSE_COVERAGE_COORDINATES_PROPERTY_NAME:
-                if value.get("x") is not None and value.get("y") is not None:
-                    live_coordinates.append(value)
+                x = value.get("x")
+                y = value.get("y")
+                if x is not None and y is not None:
+                    live_coordinates.append([int(x), int(y)])
 
         cam_device.register_property_callback(_collect_coords)
 

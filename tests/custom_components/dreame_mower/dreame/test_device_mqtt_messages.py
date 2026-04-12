@@ -120,7 +120,7 @@ class TestDeviceMqttPropertyUpdate:
                     "params": [{"did": "-1******76", "piid": 4, "siid": 1, "value": [206, 24, 253, 239, 251, 255, 116, 17, 253, 207, 252, 255, 206]}]
                 },
                 "mowing_coordinates",
-                # 20-bit pose: x=-744 * 10 = -7440, y=-66 * 10 = -660
+                # 20-bit pose: x=-744, y=-66 (scaled by _POSE_SCALE=10)
                 lambda v: v["x"] == -7440 and v["y"] == -660
             ),
             (  # Issue #50: 1:4 13-byte pose format (mova.mower.g2529d fw 4.3.6_0169)
@@ -130,7 +130,7 @@ class TestDeviceMqttPropertyUpdate:
                     "params": [{"did": "-1******76", "piid": 4, "siid": 1, "value": [206, 152, 1, 224, 7, 0, 123, 149, 1, 192, 7, 0, 206]}]
                 },
                 "mowing_coordinates",
-                # 20-bit pose: x=408 * 10 = 4080, y=126 * 10 = 1260
+                # 20-bit pose: x=408, y=126 (scaled by _POSE_SCALE=10)
                 lambda v: v["x"] == 4080 and v["y"] == 1260
             ),
             (  # Issue #49: 1:4 13-byte pose format (mova.mower.g2529d fw 4.3.6_0169)
@@ -140,7 +140,7 @@ class TestDeviceMqttPropertyUpdate:
                     "params": [{"did": "-1******76", "piid": 4, "siid": 1, "value": [206, 123, 1, 224, 7, 0, 131, 131, 1, 224, 7, 0, 206]}]
                 },
                 "mowing_coordinates",
-                # 20-bit pose: x=379 * 10 = 3790, y=126 * 10 = 1260
+                # 20-bit pose: x=379, y=126 (scaled by _POSE_SCALE=10)
                 lambda v: v["x"] == 3790 and v["y"] == 1260
             ),
             (  # Issue #44: 5:100 unknown property (dreame.mower.g2568a fw 4.3.6_0212)

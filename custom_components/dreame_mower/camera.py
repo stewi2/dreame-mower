@@ -311,12 +311,6 @@ class DreameMowerCameraEntity(DreameMowerEntity, Camera):
             # Append robot position as [x, y]
             if x is not None and y is not None:
                 self._live_coordinates.append([int(x), int(y)])
-
-            # Append any track points from this update (already in map units)
-            for pt in coordinates_data.get('track_points', []):
-                # Skip segment-break sentinels
-                if pt[0] != 2147483647 and pt[1] != 2147483647:
-                    self._live_coordinates.append(pt)
             
             # Limit live coordinates to last 2000 points to avoid memory issues
             if len(self._live_coordinates) > 2000:
