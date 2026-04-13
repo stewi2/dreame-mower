@@ -50,6 +50,7 @@ model_map = {
     "dreame.mower.p2255": "DREAME A1",
     "dreame.mower.g2422": "DREAME A1 Pro", 
     "dreame.mower.g2408": "DREAME A2",
+    "dreame.mower.g2541e": "DREAME A3 AWD Pro 3500",
     "mova.mower.g2405a": "MOVA 600",
     "mova.mower.g2405b": "MOVA 600 Kit",
     "mova.mower.g2405c": "MOVA 1000",
